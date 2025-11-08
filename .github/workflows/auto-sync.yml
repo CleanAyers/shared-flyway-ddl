@@ -19,7 +19,6 @@ permissions:
   pull-requests: write     # Allow creating/updating PRs
   issues: write           # Allow creating issues for failed syncs
   actions: read           # Allow reading workflow status
-  metadata: read          # Allow reading repository metadata
 
 env:
   CHILD_REPOS: 'flyway-1-pipeline flyway-1-grants flyway-2-pipeline flyway-2-grants'
