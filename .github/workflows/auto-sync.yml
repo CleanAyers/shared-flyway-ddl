@@ -2,10 +2,23 @@ name: Auto Sync Child Repositories
 
 on:
   push:
+    branches: [ develop ]  # Changed from main to develop
+    # Only run on shared file changes in develop
+    paths:
+      - 'read-write-flyway-files/**'
+  pull_request:
     branches: [ main ]
-    # Removed path restriction so workflow runs on any push to main
+    # Also run on PRs to main for validation
   workflow_dispatch:
     inputs:
+      target_branch:
+        description: 'Target branch for sync (develop/main)'
+        required: false
+        default: 'develop'
+        type: choice
+        options:
+        - develop
+        - main
       force_nuclear:
         description: 'Use nuclear reset if normal sync fails'
         required: false

@@ -1,0 +1,161 @@
+name: Production Release to Main
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'read-write-flyway-files/**'
+  workflow_dispatch:
+    inputs:
+      emergency_release:
+        description: 'Emergency release (skips some checks)'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: read
+
+env:
+  CHILD_REPOS: 'flyway-1-pipeline flyway-1-grants flyway-2-pipeline flyway-2-grants'
+  GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+
+jobs:
+  production-sync:
+    name: Production Sync to All Child Repositories
+    runs-on: ubuntu-latest
+    environment: production  # Requires approval for production deployments
+    
+    steps:
+    - name: 🔑 Checkout Parent Repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.PAT_TOKEN }}
+        fetch-depth: 0
+
+    - name: 🛠️ Setup Git Configuration
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+    - name: 📦 Install GitHub CLI
+      run: |
+        type -p curl >/dev/null || sudo apt update && sudo apt install curl -y
+        curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+        && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+        && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+        && sudo apt update \
+        && sudo apt install gh -y
+
+    - name: 🔐 Setup GitHub CLI Authentication
+      env:
+        GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+      run: |
+        echo "🔍 Checking token type..."
+        if [[ "$GH_TOKEN" == github_pat_* ]]; then
+          echo "✅ Using Personal Access Token (PAT) for PRODUCTION"
+        else
+          echo "❌ Invalid token type for production release"
+          exit 1
+        fi
+        gh auth status
+
+    - name: 🔧 Setup Git Credentials for Token Authentication
+      run: |
+        git config --global url."https://${GH_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
+
+    - name: 📂 Clone Child Repositories
+      env:
+        GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+      run: |
+        echo "📂 Cloning child repositories for PRODUCTION sync..."
+        cd /home/runner/work/shared-flyway-ddl
+        
+        gh auth status || { echo "❌ gh authentication failed"; exit 1; }
+        
+        for repo in flyway-1-pipeline flyway-1-grants flyway-2-pipeline flyway-2-grants; do
+          echo "Checking CleanAyers/$repo..."
+          if ! gh repo view "CleanAyers/$repo" >/dev/null 2>&1; then
+            echo "❌ CleanAyers/$repo does not exist or gh cannot access it."
+            exit 1
+          fi
+        
+          if [ ! -d "$repo" ]; then
+            echo "Cloning $repo..."
+            if gh repo clone "CleanAyers/$repo" "$repo"; then
+              echo "✅ Successfully cloned $repo with gh"
+            else
+              echo "❌ Failed to clone CleanAyers/$repo"
+              exit 1
+            fi
+          else
+            echo "$repo already exists, updating..."
+            cd "$repo"
+            git fetch --all
+            git reset --hard origin/main || true
+            cd ..
+          fi
+        done
+
+    - name: 🚀 Production Release - Publish and Sync
+      id: production_sync
+      run: |
+        echo "🚀 Starting PRODUCTION release sync..."
+        
+        # Publish to delivery branch
+        echo "📤 Publishing shared content to delivery branch..."
+        ./repo-tools/unified_flyway_sync.sh publish
+        
+        # Sync all child repositories
+        echo "🔄 Syncing child repositories in PRODUCTION..."
+        if ./repo-tools/unified_flyway_sync.sh sync --auto-commit; then
+          echo "sync_success=true" >> $GITHUB_OUTPUT
+        else
+          echo "sync_success=false" >> $GITHUB_OUTPUT
+          echo "❌ PRODUCTION sync failed!"
+          exit 1
+        fi
+
+    - name: 📊 Verify Production Sync Status
+      run: |
+        echo "📊 Verifying PRODUCTION sync status..."
+        ./repo-tools/unified_flyway_sync.sh status
+
+    - name: 📝 Generate Production Release Report
+      run: |
+        echo "# 🚀 Production Release Report - $(date)" > production_release_report.md
+        echo "" >> production_release_report.md
+        echo "## Release Summary" >> production_release_report.md
+        echo "- **Environment**: PRODUCTION" >> production_release_report.md
+        echo "- **Commit**: ${{ github.sha }}" >> production_release_report.md
+        echo "- **Released by**: ${{ github.actor }}" >> production_release_report.md
+        echo "- **Release time**: $(date)" >> production_release_report.md
+        echo "" >> production_release_report.md
+        
+        if [[ "${{ steps.production_sync.outputs.sync_success }}" == "true" ]]; then
+          echo "✅ **Status**: Production release successful" >> production_release_report.md
+        else
+          echo "❌ **Status**: Production release failed" >> production_release_report.md
+        fi
+        
+        echo "" >> production_release_report.md
+        echo "## Synchronized Repositories" >> production_release_report.md
+        echo "- flyway-1-pipeline" >> production_release_report.md
+        echo "- flyway-1-grants" >> production_release_report.md
+        echo "- flyway-2-pipeline" >> production_release_report.md
+        echo "- flyway-2-grants" >> production_release_report.md
+        echo "" >> production_release_report.md
+        echo "## Detailed Status" >> production_release_report.md
+        echo '```' >> production_release_report.md
+        ./repo-tools/unified_flyway_sync.sh status >> production_release_report.md 2>&1 || true
+        echo '```' >> production_release_report.md
+
+    - name: 📎 Upload Production Release Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: production-release-report-${{ github.run_number }}
+        path: production_release_report.md
+        retention-days: 90  # Keep production reports longer
