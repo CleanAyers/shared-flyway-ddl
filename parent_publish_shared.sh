@@ -1,38 +1,38 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# CONFIG
-SPLIT_PATH="shared/shared-ddl"
-SPLIT_BRANCH="shared-ddl-branch"
-REMOTE="origin"
-BASE_BRANCH="main"
+REMOTE=origin
+SRC_BRANCH=main
+SRC_PATH=shared          # your shared files now live directly under shared/
+DELIVERY=ro-shared-ddl   # delivery branch
 
-echo "== Parent: publishing ${SPLIT_PATH} as ${SPLIT_BRANCH} from ${BASE_BRANCH} =="
+echo "== Parent: publish ${SRC_PATH}/ → ${DELIVERY} from ${SRC_BRANCH} =="
 
-# Ensure we’re on main with latest
-git switch "${BASE_BRANCH}"
-git pull --ff-only "${REMOTE}" "${BASE_BRANCH}"
+git switch "${SRC_BRANCH}"
+git pull --ff-only "${REMOTE}" "${SRC_BRANCH}"
 
-# Sanity checks
-if ! git ls-files -- "${SPLIT_PATH}" | grep -q .; then
-  echo "ERROR: No tracked files under ${SPLIT_PATH}. Commit something first."
-  exit 1
+# sanity checks
+git ls-files -- "${SRC_PATH}" >/dev/null || { echo "No tracked files in ${SRC_PATH}/"; exit 1; }
+git log -1 -- "${SRC_PATH}" >/dev/null || { echo "No commits touch ${SRC_PATH}/"; exit 1; }
+
+# try subtree split (explicit range helps with caches)
+set +e
+git subtree split --prefix="${SRC_PATH}" --branch "${DELIVERY}" "${SRC_BRANCH}~999999..${SRC_BRANCH}"
+RC=$?
+set -e
+
+# fallback: orphan rebuild if subtree split is stubborn
+if [[ $RC -ne 0 ]]; then
+  echo "subtree split balked — rebuilding delivery branch (orphan)…"
+  git checkout --orphan "${DELIVERY}"
+  git rm -rf . 2>/dev/null || true
+  git checkout "${SRC_BRANCH}" -- "${SRC_PATH}"
+  rsync -a "${SRC_PATH}/" ./
+  git rm -r "${SRC_PATH}" 2>/dev/null || true
+  git add -A
+  git commit -m "build: export ${SRC_PATH}/ for delivery"
 fi
 
-if ! git log --oneline -- "${SPLIT_PATH}" | head -n1 >/dev/null; then
-  echo "ERROR: No commits touch ${SPLIT_PATH}. Commit something first."
-  exit 1
-fi
-
-# Produce/refresh split branch (robust form)
-git subtree split --prefix="${SPLIT_PATH}" --branch "${SPLIT_BRANCH}" "${BASE_BRANCH}" || {
-  echo "subtree split had trouble; trying force re-point"
-  SHA="$(git subtree split -P "${SPLIT_PATH}")"
-  git branch -f "${SPLIT_BRANCH}" "${SHA}"
-}
-
-# Push delivery branch
-git push -u "${REMOTE}" "${SPLIT_BRANCH}" --force
-
-echo "== Done. Pushed ${SPLIT_BRANCH} to ${REMOTE}. =="
-echo "Next: run a child sync script to pull into each child repo."
+git push -u "${REMOTE}" "${DELIVERY}" --force
+git switch "${SRC_BRANCH}"
+echo "== Done: pushed ${DELIVERY} =="
