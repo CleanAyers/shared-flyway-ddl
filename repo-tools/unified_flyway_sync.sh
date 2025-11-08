@@ -9,17 +9,19 @@ set -euo pipefail
 RED=$'\033[31m'; GREEN=$'\033[32m'; YEL=$'\033[33m'; CYAN=$'\033[36m'; BOLD=$'\033[1m'; NC=$'\033[0m'
 
 # Configuration
-PARENT_SHARED_PATH="read-write-flyway-files"    # Source directory in parent
-CHILD_SUBTREE_PATH="read-write-flyway-files"    # Target directory in children (same name!)
-DELIVERY_BRANCH="ro-shared-ddl"                 # Parent delivery branch
+BASE_DIR="$HOME/Documents/Codex/Work/Flyway-Repo-Structure"
+PARENT_DIR="$BASE_DIR/shared-flyway-ddl"
+PARENT_SHARED_PATH="read-write-flyway-files"
+CHILD_SUBTREE_PATH="read-only-flyway-files"  # Updated to match renamed directories
+DELIVERY_BRANCH="ro-shared-ddl"
 CHILD_REPOS=("flyway-1-pipeline" "flyway-1-grants" "flyway-2-pipeline" "flyway-2-grants")
+CHILD_BRANCH="main"
 
 # Script options
 OPERATION=""
 AUTO_COMMIT=0
 AUTO_STASH=0
 FORCE_NUCLEAR=0
-CHILD_BRANCH="main"
 PARENT_BRANCH="$DELIVERY_BRANCH"
 
 # Help function
