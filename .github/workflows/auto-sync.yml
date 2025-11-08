@@ -52,6 +52,29 @@ jobs:
       run: |
         echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
+    - name: 📂 Clone Child Repositories
+      run: |
+        echo "📂 Cloning child repositories..."
+        cd /home/runner/work/shared-flyway-ddl
+        
+        # Clone each child repository
+        for repo in flyway-1-pipeline flyway-1-grants flyway-2-pipeline flyway-2-grants; do
+          if [ ! -d "$repo" ]; then
+            echo "Cloning $repo..."
+            gh repo clone "CleanAyers/$repo" "$repo" || {
+              echo "Failed to clone $repo, trying with git..."
+              git clone "https://github.com/CleanAyers/$repo.git" "$repo"
+            }
+          else
+            echo "$repo already exists, updating..."
+            cd "$repo"
+            git pull origin main || true
+            cd ..
+          fi
+        done
+        
+        echo "✅ All child repositories ready"
+
     - name: 🔍 Check Current Sync Status
       id: initial_status
       run: |
