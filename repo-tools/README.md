@@ -259,6 +259,98 @@ Parent tree: 72e855a5d45a...
 
 ---
 
+## 🔧 Child Repository Settings
+
+All child repositories must have specific GitHub Actions settings configured to work with the automated sync system. Each child repo should have these settings at:
+
+- `https://github.com/CleanAyers/flyway-1-pipeline/settings/actions`
+- `https://github.com/CleanAyers/flyway-1-grants/settings/actions`
+- `https://github.com/CleanAyers/flyway-2-pipeline/settings/actions`
+- `https://github.com/CleanAyers/flyway-2-grants/settings/actions`
+
+### Required Settings
+
+#### Fork Pull Request Workflows
+- ✅ **Run workflows from fork pull requests** - Enabled
+- ✅ **Send write tokens to workflows from fork pull requests** - Enabled
+- ⬜ **Send secrets and variables to workflows from fork pull requests** - Disabled
+- ⬜ **Require approval for fork pull request workflows** - Disabled
+
+#### Workflow Permissions
+- 🔘 **Read and write permissions** - Selected
+- ⬜ **Read repository contents and packages permissions** - Not selected
+- ✅ **Allow GitHub Actions to create and approve pull requests** - Enabled
+
+#### Access
+- 🔘 **Accessible from repositories owned by the user 'CleanAyers'** - Selected
+
+### Verifying Settings via GitHub CLI
+
+You can verify these settings using the GitHub CLI:
+
+```bash
+# Check workflow permissions for all child repos
+for repo in flyway-1-pipeline flyway-1-grants flyway-2-pipeline flyway-2-grants; do
+    echo "=== $repo ==="
+    gh api repos/CleanAyers/$repo --jq '.permissions.actions'
+    gh api repos/CleanAyers/$repo/actions/permissions --jq '.'
+    echo
+done
+
+# Check specific workflow permissions
+gh api repos/CleanAyers/flyway-1-pipeline/actions/permissions
+
+# List all repository settings (requires admin access)
+gh api repos/CleanAyers/flyway-1-pipeline --jq '{
+    name: .name,
+    private: .private,
+    permissions: .permissions,
+    default_branch: .default_branch
+}'
+```
+
+### Batch Verification Script
+
+Create a quick verification script:
+
+```bash
+#!/bin/bash
+# verify-child-repo-settings.sh
+
+REPOS=("flyway-1-pipeline" "flyway-1-grants" "flyway-2-pipeline" "flyway-2-grants")
+
+for repo in "${REPOS[@]}"; do
+    echo "🔍 Checking $repo..."
+    
+    # Check if repo exists and is accessible
+    if gh repo view CleanAyers/$repo >/dev/null 2>&1; then
+        echo "  ✅ Repository accessible"
+        
+        # Check workflow permissions
+        PERMISSIONS=$(gh api repos/CleanAyers/$repo/actions/permissions --jq '.enabled')
+        if [ "$PERMISSIONS" = "true" ]; then
+            echo "  ✅ Actions enabled"
+        else
+            echo "  ❌ Actions disabled"
+        fi
+        
+        # Check default workflow permissions
+        DEFAULT_PERMS=$(gh api repos/CleanAyers/$repo/actions/permissions/selected-actions --jq '.default_workflow_permissions' 2>/dev/null || echo "read")
+        echo "  📋 Default permissions: $DEFAULT_PERMS"
+        
+    else
+        echo "  ❌ Repository not accessible"
+    fi
+    echo
+done
+```
+
+---
+
+## 🚨 Troubleshooting Settings
+
+---
+
 ## ❌ Troubleshooting
 
 ### Common Issues & Solutions
