@@ -1,3 +1,29 @@
+# Shared Flyway DDL - Distributed Architecture
+
+## 🔄 Repository Sync Status
+
+[![Auto Sync Pipeline](https://github.com/CleanAyers/shared-flyway-ddl/actions/workflows/auto-sync.yml/badge.svg)](https://github.com/CleanAyers/shared-flyway-ddl/actions/workflows/auto-sync.yml)
+
+| Repository | Status | Last Sync | Branch | Notes |
+|------------|--------|-----------|---------|-------|
+| **flyway-1-pipeline** | ![Sync Status](https://img.shields.io/github/workflow/status/CleanAyers/shared-flyway-ddl/Check%20Sync%20Status?label=synced&style=flat-square) | ![Last Commit](https://img.shields.io/github/last-commit/CleanAyers/flyway-1-pipeline/main?label=&style=flat-square) | `main` | Pipeline Database |
+| **flyway-1-grants** | ![Sync Status](https://img.shields.io/github/workflow/status/CleanAyers/shared-flyway-ddl/Check%20Sync%20Status?label=synced&style=flat-square) | ![Last Commit](https://img.shields.io/github/last-commit/CleanAyers/flyway-1-grants/main?label=&style=flat-square) | `main` | Grants & Permissions |
+| **flyway-2-pipeline** | ![Sync Status](https://img.shields.io/github/workflow/status/CleanAyers/shared-flyway-ddl/Check%20Sync%20Status?label=synced&style=flat-square) | ![Last Commit](https://img.shields.io/github/last-commit/CleanAyers/flyway-2-pipeline/main?label=&style=flat-square) | `main` | Pipeline Database |
+| **flyway-2-grants** | ![Sync Status](https://img.shields.io/github/workflow/status/CleanAyers/shared-flyway-ddl/Check%20Sync%20Status?label=synced&style=flat-square) | ![Last Commit](https://img.shields.io/github/last-commit/CleanAyers/flyway-2-grants/main?label=&style=flat-square) | `main` | Grants & Permissions |
+
+### 🎯 Quick Actions
+- **📊 [Check Detailed Status](../../actions/workflows/sync-status.yml)** - View complete synchronization report
+- **🔄 [Manual Sync](../../actions/workflows/auto-sync.yml)** - Trigger synchronization manually
+- **📋 [View Logs](../../actions)** - See recent sync operations
+
+### 🚀 Automation Status
+- **✅ Auto-sync on push to `main`** - Automatically syncs all child repositories
+- **✅ Status monitoring** - Real-time sync status tracking
+- **✅ Conflict detection** - Alerts on sync issues
+- **🔔 Notifications** - Slack/email alerts on failures (optional)
+
+---
+
 ## Running Postgres DB related Notes
 - Quick Start on Mac
 
