@@ -1,227 +1,182 @@
-# Distributed Flyway Synchronization Scripts
+# Unified Flyway Sync Script
 
-This directory contains three powerful scripts that manage the distributed Flyway architecture, handling synchronization between the parent repository (`shared-flyway-ddl`) and all child repositories (`flyway-X-pipeline`, `flyway-X-grants`).
+A single, powerful script that manages the entire distributed Flyway architecture by handling synchronization between the parent repository (`shared-flyway-ddl`) and all child repositories (`flyway-X-pipeline`, `flyway-X-grants`).
 
-## 📋 Overview
+## 🎯 What This Script Does
 
-The distributed Flyway system uses **Git subtrees** to share common content from the parent repository to all child repositories. These scripts automate the complex Git operations required to keep everything synchronized.
+This unified script **replaces three separate tools** and provides a single interface for:
+- **Publishing** shared content from parent to delivery branch
+- **Syncing** all child repositories with latest parent changes
+- **Nuclear reset** when Git subtrees get corrupted
+- **Status checking** to verify synchronization state
 
-### Architecture Summary
-```
-Parent Repo (shared-flyway-ddl)
-├── read-wrte-flyway-files/     ← Edit shared content here
-└── ro-shared-ddl               ← Delivery branch (auto-generated)
-    
-Child Repos (flyway-X-pipeline, flyway-X-grants)  
-└── read-only-flyway-files/     ← Synced content (DO NOT EDIT)
-```
+## 📋 Script Location & Setup
 
----
-
-## 🛠️ Scripts Overview
-
-| Script | Purpose | When to Use | Safety Level |
-|--------|---------|-------------|--------------|
-| `parent_publish_shared.sh` | Export parent content to delivery branch | After editing shared content | Safe |
-| `parentPusher.sh` | Sync children with parent changes | Regular sync operations | Safe |
-| `justWork.sh` | Nuclear reset all children | When Git gets confused | ⚠️ Destructive |
-
----
-
-## 1. 📤 `parent_publish_shared.sh`
-
-**Purpose**: Exports the `read-wrte-flyway-files/` folder from the parent repository to the `ro-shared-ddl` delivery branch.
-
-### When to Use
-- After making changes to shared content in the parent repository
-- Before syncing children (required first step)
-- When preparing a new release of shared content
-
-### Usage
 ```bash
-# Run from parent repository root (shared-flyway-ddl)
+# Location
+/Users/joshx86/Documents/Codex/Work/Flyway-Repo-Structure/shared-flyway-ddl/repo-tools/unified_flyway_sync.sh
+
+# Make executable (if needed)
+chmod +x repo-tools/unified_flyway_sync.sh
+
+# Always run from parent repository root
 cd shared-flyway-ddl
-./tools/parent_publish_shared.sh
 ```
-
-### What It Does
-1. **Validates** that `read-wrte-flyway-files/` has tracked content
-2. **Exports** the folder using `git subtree split`
-3. **Creates/updates** the `ro-shared-ddl` branch
-4. **Pushes** the delivery branch to GitHub
-5. **Fallback**: Uses orphan branch rebuild if subtree split fails
-
-### Example Output
-```
-== Parent: publish read-wrte-flyway-files/ → ro-shared-ddl from main ==
-Already on 'main'
-Added dir 'read-wrte-flyway-files'
-== Done: pushed ro-shared-ddl ==
-```
-
-### Safety Notes
-- ✅ **Safe**: Only affects the delivery branch
-- ✅ **Non-destructive**: Won't affect your main branch or child repos
-- ⚠️ **Force pushes** to `ro-shared-ddl` branch (expected behavior)
 
 ---
 
-## 2. 🔄 `parentPusher.sh` (validate_children_ro_shared.sh)
+## 🛠️ Operations
 
-**Purpose**: Synchronizes all child repositories with the latest shared content from the parent's delivery branch.
+The script supports five main operations:
 
-### When to Use
-- After running `parent_publish_shared.sh`
-- Regular maintenance to ensure children are up-to-date
-- Before making child-specific changes (to start with latest shared content)
+| Operation | Purpose | Safety Level | Use Case |
+|-----------|---------|--------------|----------|
+| `status` | Check sync status (read-only) | ✅ Safe | Daily monitoring |
+| `publish` | Export parent content to delivery branch | ✅ Safe | After making shared changes |
+| `sync` | Sync all children with parent | ✅ Safe | Regular maintenance |
+| `full` | Complete workflow: publish → sync | ✅ Safe | **Most common usage** |
+| `nuclear` | Force reset all children | ⚠️ **Destructive** | Emergency recovery |
 
-### Usage Options
+---
+
+## 🚀 Command Reference
+
+### Basic Usage Pattern
 ```bash
-# Check sync status (read-only)
-./tools/parentPusher.sh
-
-# Fix any out-of-sync children
-./tools/parentPusher.sh --fix
-
-# Fix and automatically commit any dirty working trees
-./tools/parentPusher.sh --fix --auto-commit
-
-# Custom options
-./tools/parentPusher.sh --fix --auto-commit \
-  --base "/custom/path" \
-  --child-branch develop \
-  --parent-branch ro-shared-ddl
+./repo-tools/unified_flyway_sync.sh [OPERATION] [OPTIONS]
 ```
 
-### Command Line Options
-
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--fix` | Actually perform sync operations | Check-only mode |
-| `--auto-commit` | Auto-commit dirty working trees | Fail on dirty repos |
-| `--auto-stash` | Auto-stash dirty working trees | Fail on dirty repos |
-| `--base PATH` | Custom children repository location | Parent's parent dir |
-| `--child-branch BRANCH` | Target branch in children | `main` |
-| `--parent-branch BRANCH` | Source branch in parent | `ro-shared-ddl` |
-
-### What It Does
-1. **Discovers** all child repositories (flyway-*-pipeline, flyway-*-grants)
-2. **Clones** missing repositories from GitHub
-3. **Handles** dirty working trees (commit/stash/fail based on options)
-4. **Compares** Git tree hashes between parent and children
-5. **Syncs** out-of-date children using `git subtree pull/add`
-6. **Pushes** changes to each child's GitHub repository
-
-### Example Output
+### 1. 📊 Status Check (Read-Only)
+**Check if all repositories are synchronized:**
+```bash
+./repo-tools/unified_flyway_sync.sh status
 ```
-Parent: /Users/joshx86/.../shared-flyway-ddl
-Children base: /Users/joshx86/.../Flyway-Repo-Structure
-Delivery branch: ro-shared-ddl
+
+**Example output:**
+```
+📊 STATUS CHECK
+Parent tree: 72e855a5d45a...
 
 -- flyway-1-pipeline
-  OK: up to date (tree 72e855a5...)
+  ✓ SYNCED (tree 72e855a5d45a...)
+-- flyway-1-grants
+  ✗ OUT-OF-DATE (child: a1b2c3... parent: 72e855a5...)
 
--- flyway-1-grants  
-  OUT-OF-DATE: child=635594f... parent=72e855a5...
-  Subtree pull → read-only-flyway-files/
-  FIXED: now up to date (tree 72e855a5...)
-
-✅ All children match the parent delivery branch.
+⚠️  SYNC REQUIRED
+Run: ./unified_flyway_sync.sh sync --auto-commit
 ```
 
-### Safety Notes
-- ✅ **Safe**: Validates before making changes
-- ✅ **Atomic**: Either fully succeeds or fails cleanly
-- ⚠️ **Requires clean repos**: Use `--auto-commit` or manually commit first
-- 🔒 **Uses tree hashes**: Ensures exact synchronization
+### 2. 📤 Publish Parent Content
+**Export shared content to delivery branch:**
+```bash
+./repo-tools/unified_flyway_sync.sh publish
+```
 
----
+**What it does:**
+- Validates `read-write-flyway-files/` has content
+- Exports folder to `ro-shared-ddl` delivery branch
+- Pushes to GitHub for children to consume
 
-## 3. ☢️ `justWork.sh` (Nuclear Option)
+### 3. 🔄 Sync All Children
+**Synchronize all child repositories:**
+```bash
+# Basic sync (fails on dirty repos)
+./repo-tools/unified_flyway_sync.sh sync
 
-**Purpose**: Forces a complete reset and resynchronization of all child repositories when normal sync operations fail.
+# Auto-commit dirty repos before syncing
+./repo-tools/unified_flyway_sync.sh sync --auto-commit
 
-### ⚠️ **DANGER: DESTRUCTIVE OPERATION**
+# Auto-stash dirty repos before syncing  
+./repo-tools/unified_flyway_sync.sh sync --auto-stash
+```
 
-This script will **OVERWRITE** any local changes in `read-only-flyway-files/` folders across all children.
+### 4. 🎯 Full Workflow (Most Common)
+**Complete publish + sync in one command:**
+```bash
+# Most common usage - handles everything
+./repo-tools/unified_flyway_sync.sh full --auto-commit
+```
 
-### When to Use (Last Resort Only)
-- Git subtree operations are failing repeatedly
-- Child repositories have corrupted subtree history
-- Folder structure changes (like the recent name change)
-- After major refactoring of shared content
+**What it does:**
+1. Publishes parent `read-write-flyway-files/` → `ro-shared-ddl` branch
+2. Syncs all 4 child repositories with the published content
+3. Auto-commits any dirty working trees in children
+4. Pushes all changes to GitHub
 
-### Usage
+### 5. ☢️ Nuclear Reset (Emergency Only)
+**Force reset when Git subtrees are corrupted:**
 ```bash
 # Interactive confirmation required
-cd shared-flyway-ddl
-./tools/justWork.sh
+./repo-tools/unified_flyway_sync.sh nuclear
 
-# Confirmation prompt
-🚨 NUCLEAR SUBTREE SYNC
-This will FORCE sync all read-only-flyway-files folders from the parent repository.
-Any local changes in read-only-flyway-files will be OVERWRITTEN!
-
-Are you absolutely sure you want to proceed? (type 'NN' to confirm): NN
+# Skip confirmation (dangerous!)
+./repo-tools/unified_flyway_sync.sh nuclear --force-nuclear
 ```
 
-### What It Does
-1. **Confirms** destructive operation with user
-2. **Stashes** any uncommitted changes in children
-3. **Removes** existing `read-only-flyway-files/` folders completely
-4. **Cleans** Git subtree configuration and history
-5. **Adds** fresh subtrees from parent delivery branch
-6. **Pushes** all changes to GitHub
-7. **Verifies** sync by comparing directories
-8. **Reinstalls** Git hooks in all children
-
-### Example Output
-```
--- flyway-1-pipeline
-  NUKE: Removing existing read-only-flyway-files folder...
-  ADD: Adding fresh read-only-flyway-files subtree...
-  ✓ Successfully synced subtree
-  ✓ Successfully pushed
-
-🎉 All repositories successfully synced!
-✓ PERFECT SYNC: Directories are identical
-🪝 Git hooks installed
-```
-
-### Safety Notes
-- ⚠️ **DESTRUCTIVE**: Removes all local changes in shared folders
-- 🔒 **Stashes changes**: Uncommitted work is preserved in Git stash
-- ✅ **Verification**: Compares final state with parent
-- 🪝 **Reinstalls hooks**: Restores Git protection hooks
+⚠️ **WARNING**: This operation is **DESTRUCTIVE** and will:
+- Remove all existing `read-only-flyway-files/` folders
+- Stash any uncommitted changes
+- Add fresh subtrees from parent
+- **Overwrite any local modifications** in shared folders
 
 ---
 
-## 🚀 Common Workflows
+## ⚙️ Command Line Options
 
-### Daily Development Workflow
+### General Options
+| Option | Description | Default | Example |
+|--------|-------------|---------|---------|
+| `--help` | Show help and usage | - | `./script.sh --help` |
+| `--child-branch BRANCH` | Target branch in children | `main` | `--child-branch develop` |
+
+### Dirty Working Tree Handling
+| Option | Description | Use When |
+|--------|-------------|----------|
+| `--auto-commit` | Auto-commit dirty repos before sync | **Recommended** for routine operations |
+| `--auto-stash` | Auto-stash dirty repos before sync | When you want to preserve uncommitted work |
+| _(none)_ | Fail if repos are dirty | When you want explicit control |
+
+**⚠️ Note**: `--auto-commit` and `--auto-stash` are mutually exclusive.
+
+### Nuclear Options
+| Option | Description | Use Case |
+|--------|-------------|----------|
+| `--force-nuclear` | Skip interactive confirmation | Automation scripts |
+
+---
+
+## 🔄 Daily Workflows
+
+### Standard Development Workflow
 ```bash
-# 1. Make changes to shared content in parent
+# 1. Make changes to shared content
 cd shared-flyway-ddl
-# Edit files in read-wrte-flyway-files/
+# Edit files in read-write-flyway-files/
 
-# 2. Publish changes
-./tools/parent_publish_shared.sh
+# 2. Publish and sync everything (one command)
+./repo-tools/unified_flyway_sync.sh full --auto-commit
 
-# 3. Sync all children
-./tools/parentPusher.sh --fix --auto-commit
+# 3. Verify sync completed
+./repo-tools/unified_flyway_sync.sh status
+```
+
+### Quick Status Check Workflow
+```bash
+# Check if everything is in sync
+./repo-tools/unified_flyway_sync.sh status
+
+# If out of sync, fix it
+./repo-tools/unified_flyway_sync.sh sync --auto-commit
 ```
 
 ### Emergency Recovery Workflow
 ```bash
-# When normal sync fails
-cd shared-flyway-ddl
+# When Git subtrees are corrupted
+./repo-tools/unified_flyway_sync.sh nuclear
+# Type 'NUKE' to confirm
 
-# Try nuclear option
-./tools/justWork.sh
-# Type 'NN' to confirm
-
-# Verify everything is working
-./tools/parentPusher.sh
+# Verify nuclear reset worked
+./repo-tools/unified_flyway_sync.sh status
 ```
 
 ### New Team Member Setup
@@ -231,57 +186,137 @@ git clone https://github.com/CleanAyers/shared-flyway-ddl.git
 cd shared-flyway-ddl
 
 # Auto-clone and sync all children
-./tools/parentPusher.sh --fix --auto-commit
+./repo-tools/unified_flyway_sync.sh sync --auto-commit
 ```
+
+---
+
+## 📁 Architecture Overview
+
+The script manages this folder structure:
+
+```
+Parent Repository (shared-flyway-ddl):
+├── read-write-flyway-files/        # ✅ EDIT HERE
+│   ├── callbacks/                  # Flyway lifecycle callbacks
+│   ├── global_config/             # Shared configuration templates  
+│   ├── hooks/                     # Git protection hooks
+│   ├── scripts/                   # Shared automation scripts
+│   ├── sh/                        # Shell utilities
+│   └── sql/                       # Shared SQL migrations
+└── ro-shared-ddl                  # 🤖 AUTO-GENERATED delivery branch
+
+Child Repositories (flyway-X-pipeline, flyway-X-grants):
+└── read-only-flyway-files/        # 🚫 DO NOT EDIT - Synced content
+    ├── callbacks/                  # (Same structure as parent)
+    ├── global_config/             
+    ├── hooks/                     
+    ├── scripts/                   
+    ├── sh/                        
+    └── sql/                       
+```
+
+---
+
+## 🔍 Understanding Script Output
+
+### Status Check Output
+```bash
+📊 STATUS CHECK
+Parent tree: 72e855a5d45a3bcd0cf490e0e2dc32c729fdbf6b
+
+-- flyway-1-pipeline
+  ✓ SYNCED (tree 72e855a5d45a...)     # In sync
+-- flyway-1-grants  
+  ✗ OUT-OF-DATE (child: a1b2c3... parent: 72e855a5...)  # Needs sync
+-- flyway-2-pipeline
+  ⚠️  NO SUBTREE (read-only-flyway-files missing)        # Needs initial setup
+-- flyway-2-grants
+  📁 MISSING (Repository not cloned)                      # Needs cloning
+```
+
+### Sync Operation Output
+```bash
+🔄 SYNCING CHILDREN
+Parent tree: 72e855a5d45a...
+
+-- flyway-1-pipeline
+  🔄 AUTO-COMMIT: Committing changes...
+  🔄 PULL: Updating existing subtree
+  ✓ SYNCED: now up to date (tree 72e855a5...)
+```
+
+### Nuclear Reset Output
+```bash
+☢️ NUCLEAR RESET
+
+-- flyway-1-pipeline
+  📦 STASH: Preserving uncommitted changes
+  💥 NUKE: Removing read-only-flyway-files
+  ✅ ADD: Fresh subtree from parent
+  ✓ Nuclear reset successful
+```
+
+---
+
+## ❌ Troubleshooting
+
+### Common Issues & Solutions
+
+| Problem | Cause | Solution |
+|---------|-------|----------|
+| `"Working tree dirty"` | Uncommitted changes | Use `--auto-commit` or `--auto-stash` |
+| `"Delivery branch not found"` | Parent content not published | Run `./script.sh publish` first |
+| `"Cannot switch to branch"` | Branch doesn't exist | Check `--child-branch` option |
+| `"Failed to clone repository"` | GitHub access issues | Check GitHub CLI (`gh auth status`) |
+| `"Subtree split failed"` | Normal fallback behavior | Script automatically uses orphan rebuild |
+| Git subtrees consistently failing | Corrupted subtree history | Use `./script.sh nuclear` |
+
+### Error Exit Codes
+- `0` - Success
+- `1` - Validation errors, sync failures
+- `2` - Invalid command line arguments
+
+### Debug Tips
+1. **Always start with status check**: `./script.sh status`
+2. **Check Git remotes**: Ensure GitHub access is working
+3. **Verify parent content**: Ensure `read-write-flyway-files/` has content
+4. **Use `--auto-commit`**: Handles most common dirty tree issues
+5. **Nuclear option**: Last resort for corrupted Git state
 
 ---
 
 ## 🎯 Best Practices
 
 ### Do's ✅
-- **Always run `parent_publish_shared.sh` first** before syncing children
-- **Use `--auto-commit`** for routine operations to handle dirty repos
-- **Verify sync status** by running without `--fix` first
-- **Check for errors** in script output before proceeding
-- **Make shared changes in parent only** (`read-wrte-flyway-files/`)
+- **Use `full --auto-commit`** for routine development workflows
+- **Run `status`** before making changes to understand current state
+- **Always edit in parent** (`read-write-flyway-files/`) never in children
+- **Test in non-production repos first** when learning the tool
+- **Keep the script in `repo-tools/`** for consistency
 
 ### Don'ts ❌
-- **Never edit `read-only-flyway-files/`** directly in children
-- **Don't force push** to child repository main branches manually  
-- **Don't run scripts from wrong directory** (must be in parent root)
-- **Don't ignore dirty working tree warnings** without understanding them
-- **Avoid nuclear option** unless normal sync consistently fails
-
-### Troubleshooting
-
-| Problem | Solution |
-|---------|----------|
-| "Working tree dirty" errors | Use `--auto-commit` or manually commit |
-| "Subtree split failed" | Normal, script uses fallback method |
-| "Cannot find child repo" | Check repository names and GitHub access |
-| Git subtree consistently failing | Use nuclear option (`justWork.sh`) |
-| Permission denied | Run `chmod +x tools/*.sh` |
+- **Never edit `read-only-flyway-files/`** directly in child repositories
+- **Don't ignore dirty working tree warnings** without understanding impact
+- **Don't use nuclear option** unless normal sync consistently fails
+- **Don't run from wrong directory** - must be in parent repository root
+- **Don't mix `--auto-commit` and `--auto-stash`** in same command
 
 ---
 
-## 📊 File Structure Context
+## 🔐 Security Notes
 
-```
-shared-flyway-ddl/
-├── read-wrte-flyway-files/         # ✅ EDIT HERE
-│   ├── callbacks/                  # Flyway lifecycle callbacks
-│   ├── global_config/             # Shared configuration templates
-│   ├── hooks/                     # Git protection hooks
-│   ├── sh/                        # Shared shell scripts
-│   └── sql/                       # Shared SQL migrations
-└── tools/                         # 🛠️ SYNC SCRIPTS
-    ├── parent_publish_shared.sh    # Export to delivery branch
-    ├── parentPusher.sh            # Sync all children
-    └── justWork.sh               # Nuclear reset option
-```
-
-The scripts maintain this distributed architecture automatically, ensuring that all child repositories stay in perfect sync with the parent's shared content while preserving their individual configurations and customizations.
+- The script uses **GitHub CLI** for repository access
+- **Force pushes** to `ro-shared-ddl` branch (expected behavior)  
+- **Nuclear option stashes** uncommitted work (doesn't delete)
+- **No credentials** are stored in the script
+- All operations are **logged** and **reversible** through Git history
 
 ---
 
-**Remember**: These scripts handle complex Git subtree operations automatically. When in doubt, start with the read-only check (`./tools/parentPusher.sh`) to understand the current state before making changes.
+**💡 Quick Start**: For most use cases, simply run:
+```bash
+./repo-tools/unified_flyway_sync.sh full --auto-commit
+```
+
+This single command handles the complete workflow of publishing your shared changes and syncing all child repositories automatically.

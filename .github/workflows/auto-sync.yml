@@ -1,0 +1,114 @@
+name: Auto Sync Child Repositories
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'read-write-flyway-files/**'
+  workflow_dispatch:
+    inputs:
+      force_nuclear:
+        description: 'Use nuclear reset if normal sync fails'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  CHILD_REPOS: 'flyway-1-pipeline flyway-1-grants flyway-2-pipeline flyway-2-grants'
+
+jobs:
+  auto-sync:
+    name: Sync All Child Repositories
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 🔑 Checkout Parent Repository
+      uses: actions/checkout@v4
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        fetch-depth: 0
+
+    - name: 🛠️ Setup Git Configuration
+      run: |
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+    - name: 📊 Check Sync Status
+      id: status
+      run: |
+        echo "🔍 Checking current sync status..."
+        ./repo-tools/unified_flyway_sync.sh status || echo "status_check_failed=true" >> $GITHUB_OUTPUT
+        
+    - name: 📤 Publish Parent Content
+      run: |
+        echo "📤 Publishing shared content to delivery branch..."
+        ./repo-tools/unified_flyway_sync.sh publish
+
+    - name: 🔄 Sync All Children
+      id: sync
+      run: |
+        echo "🔄 Starting automatic sync of all child repositories..."
+        if ./repo-tools/unified_flyway_sync.sh sync --auto-commit; then
+          echo "sync_success=true" >> $GITHUB_OUTPUT
+          echo "✅ Normal sync completed successfully"
+        else
+          echo "sync_success=false" >> $GITHUB_OUTPUT
+          echo "❌ Normal sync failed"
+          exit 1
+        fi
+
+    - name: ☢️ Nuclear Reset (if normal sync failed)
+      if: failure() && github.event.inputs.force_nuclear == 'true'
+      run: |
+        echo "☢️ Normal sync failed, attempting nuclear reset..."
+        echo "⚠️ This will overwrite any local changes in child repositories"
+        ./repo-tools/unified_flyway_sync.sh nuclear --force-nuclear
+
+    - name: 📊 Final Status Verification
+      if: always()
+      run: |
+        echo "📊 Verifying final sync status..."
+        ./repo-tools/unified_flyway_sync.sh status
+
+    - name: 📝 Create Sync Report
+      if: always()
+      run: |
+        echo "# 🔄 Sync Report - $(date)" > sync_report.md
+        echo "" >> sync_report.md
+        echo "## Status Summary" >> sync_report.md
+        echo "- **Trigger**: Push to main branch" >> sync_report.md
+        echo "- **Commit**: ${{ github.sha }}" >> sync_report.md
+        echo "- **Author**: ${{ github.actor }}" >> sync_report.md
+        echo "" >> sync_report.md
+        
+        if [[ "${{ steps.sync.outputs.sync_success }}" == "true" ]]; then
+          echo "✅ **Result**: All repositories successfully synchronized" >> sync_report.md
+        else
+          echo "❌ **Result**: Synchronization failed" >> sync_report.md
+        fi
+        
+        echo "" >> sync_report.md
+        echo "## Detailed Status" >> sync_report.md
+        echo '```' >> sync_report.md
+        ./repo-tools/unified_flyway_sync.sh status >> sync_report.md 2>&1 || true
+        echo '```' >> sync_report.md
+
+    - name: 📎 Upload Sync Report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: sync-report-${{ github.run_number }}
+        path: sync_report.md
+        retention-days: 30
+
+    - name: 🚨 Notify on Failure
+      if: failure()
+      run: |
+        echo "🚨 SYNC FAILURE DETECTED"
+        echo "❌ Automatic synchronization failed for commit ${{ github.sha }}"
+        echo "👆 Check the logs above for details"
+        echo "🔧 Consider running manual sync or nuclear reset"
+        echo ""
+        echo "Quick fix commands:"
+        echo "  ./repo-tools/unified_flyway_sync.sh sync --auto-commit"
+        echo "  ./repo-tools/unified_flyway_sync.sh nuclear  # (if needed)"
