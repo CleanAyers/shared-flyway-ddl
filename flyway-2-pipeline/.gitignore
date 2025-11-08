@@ -1,0 +1,30 @@
+# Flyway build and log files
+flyway.conf
+flyway.conf.backup
+flyway.log
+flyway-output.txt
+
+# Environment variables and credentials
+.env
+*.env
+config/*.conf
+
+# IDE & OS clutter
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+
+# Ignore local SQL scratchpads
+scratch.sql
+temp.sql
+
+# Ignore generated reports or diffs
+reports/
+diffs/
+logs/
