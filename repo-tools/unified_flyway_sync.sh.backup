@@ -301,7 +301,7 @@ sync_children() {
                 echo "  ${RED}ERROR:${NC} Working tree dirty. Use --auto-commit or --auto-stash"
                 ((FAIL_COUNT++))
                 continue
-            fi
+            }
         fi
         
         # Switch to target branch and update
