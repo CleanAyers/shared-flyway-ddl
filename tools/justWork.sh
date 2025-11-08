@@ -22,8 +22,13 @@ fi
 echo ""
 echo "${CYAN}Starting nuclear subtree sync...${NC}"
 
-# Base directory
-BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Base directory - get parent of the shared-flyway-ddl directory
+PARENT_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+BASE_DIR="$(dirname "$PARENT_DIR")"
+
+echo "${CYAN}Parent directory:${NC} $PARENT_DIR"cd /Users/joshx86/Documents/Codex/Work/Flyway-Repo-Structure/shared-flyway-ddl
+./tools/parent_publish_shared.sh
+echo "${CYAN}Base directory:${NC} $BASE_DIR"
 
 # Child repositories that have read-only-flyway-files subtrees
 CHILD_REPOS=("flyway-1-pipeline" "flyway-1-grants" "flyway-2-pipeline" "flyway-2-grants")
