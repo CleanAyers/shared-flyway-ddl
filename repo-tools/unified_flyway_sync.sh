@@ -9,8 +9,8 @@ set -euo pipefail
 RED=$'\033[31m'; GREEN=$'\033[32m'; YEL=$'\033[33m'; CYAN=$'\033[36m'; BOLD=$'\033[1m'; NC=$'\033[0m'
 
 # Configuration
-PARENT_SHARED_PATH="read-write-flyway-files"    # Fixed typo: was read-wrte-flyway-files
-CHILD_SUBTREE_PATH="read-only-flyway-files"     # Consistent naming
+PARENT_SHARED_PATH="read-write-flyway-files"    # Source directory in parent
+CHILD_SUBTREE_PATH="read-write-flyway-files"    # Target directory in children (same name!)
 DELIVERY_BRANCH="ro-shared-ddl"                 # Parent delivery branch
 CHILD_REPOS=("flyway-1-pipeline" "flyway-1-grants" "flyway-2-pipeline" "flyway-2-grants")
 
@@ -127,31 +127,18 @@ publish_shared() {
     
     echo "✓ Source validation passed"
     
-    # Try subtree split first
-    echo "🔄 Attempting subtree split..."
-    set +e
-    git subtree split --prefix="$PARENT_SHARED_PATH" --branch "$DELIVERY_BRANCH" "main~999999..main"
-    RC=$?
-    set -e
+    # Use subtree split to preserve directory structure
+    echo "🔄 Creating subtree split for $PARENT_SHARED_PATH..."
     
-    # Fallback to orphan rebuild if needed
-    if [[ $RC -ne 0 ]]; then
-        echo "⚠️  Subtree split failed, using orphan rebuild..."
-        
-        # Clean up existing branch
-        git branch -D "$DELIVERY_BRANCH" 2>/dev/null || true
-        
-        # Create orphan branch
-        git checkout --orphan "$DELIVERY_BRANCH"
-        git rm -rf . 2>/dev/null || true
-        git checkout main -- "$PARENT_SHARED_PATH"
-        
-        # Move content to root
-        rsync -a "$PARENT_SHARED_PATH/" ./
-        git rm -r "$PARENT_SHARED_PATH" 2>/dev/null || true
-        
-        git add -A
-        git commit -m "build: export $PARENT_SHARED_PATH/ for delivery ($(date +%Y-%m-%d))"
+    # Clean up existing branch
+    git branch -D "$DELIVERY_BRANCH" 2>/dev/null || true
+    
+    # Create subtree split (this preserves the directory structure)
+    if git subtree split --prefix="$PARENT_SHARED_PATH" --branch "$DELIVERY_BRANCH"; then
+        echo "✅ Subtree split successful"
+    else
+        echo "${RED}ERROR: Subtree split failed${NC}"
+        exit 1
     fi
     
     # Push delivery branch
