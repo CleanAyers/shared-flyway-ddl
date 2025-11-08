@@ -1,6 +1,3 @@
-# shared/ folder
-- Do *not* edit unless you are on the parent directory (shared-flyway-ddl)
-
 ## Overview
 This folder serves as the **centralized source of shared truth** 
 
