@@ -7,11 +7,12 @@ set -euo pipefail
 #   ./validate_children_ro_shared.sh --fix
 #   ./validate_children_ro_shared.sh --fix --auto-commit
 #   ./validate_children_ro_shared.sh --fix --auto-stash
-#   ./validate_children_ro_shared.sh --fix --base "/path/to/children" --child-branch main
+#   ./validate_children_ro_shared.sh --fix --base "/path/to/children" --child-branch main --parent-branch ro-shared-ddl
 
 FIX=0
 BASE_OVERRIDE=""
 CHILD_BRANCH="main"
+PARENT_DELIVERY_BRANCH="ro-shared-ddl"
 AUTO_COMMIT=0
 AUTO_STASH=0
 
@@ -30,6 +31,11 @@ while [[ $# -gt 0 ]]; do
         echo "ERROR: --child-branch requires a value"; exit 2
       fi
       CHILD_BRANCH="$2"; shift 2;;
+    --parent-branch)
+      if [[ $# -lt 2 ]]; then
+        echo "ERROR: --parent-branch requires a value"; exit 2
+      fi
+      PARENT_DELIVERY_BRANCH="$2"; shift 2;;
     *) echo "Unknown arg: $1"; exit 2;;
   esac
 done
@@ -57,9 +63,9 @@ fi
 
 # Config
 CHILD_REPOS=("flyway-1-pipeline" "flyway-1-grants" "flyway-2-pipeline" "flyway-2-grants")
-DELIVERY_BRANCH="ro-shared-ddl"    # parent delivery branch
-PREFIX_DIR="ro-shared-ddl"         # subtree folder inside each child
-PARENT_REMOTE_NAME="parent-shared" # name to use inside each child for the parent remote
+DELIVERY_BRANCH="$PARENT_DELIVERY_BRANCH"    # parent delivery branch (now configurable)
+PREFIX_DIR="ro-shared-ddl"                   # subtree folder inside each child
+PARENT_REMOTE_NAME="parent-shared"           # name to use inside each child for the parent remote
 PARENT_URL="$(git remote get-url origin)"
 
 echo "${CYAN}Parent:${NC} $PARENT_DIR"
