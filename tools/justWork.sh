@@ -1,6 +1,6 @@
 #!/bin/bash
 # Nuclear subtree sync script - Forces all child repos to sync with parent
-# WARNING: This will overwrite any local changes in ro-shared-ddl folders
+# WARNING: This will overwrite any local changes in read-only-flyway-files folders
 
 set -euo pipefail
 
@@ -8,8 +8,8 @@ set -euo pipefail
 RED=$'\033[31m'; GREEN=$'\033[32m'; YEL=$'\033[33m'; CYAN=$'\033[36m'; BOLD=$'\033[1m'; NC=$'\033[0m'
 
 echo "${BOLD}${RED}🚨 NUCLEAR SUBTREE SYNC${NC}"
-echo "${RED}This will FORCE sync all ro-shared-ddl folders from the parent repository.${NC}"
-echo "${RED}Any local changes in ro-shared-ddl will be OVERWRITTEN!${NC}"
+echo "${RED}This will FORCE sync all read-only-flyway-files folders from the parent repository.${NC}"
+echo "${RED}Any local changes in read-only-flyway-files will be OVERWRITTEN!${NC}"
 echo ""
 
 # Ask for confirmation
@@ -25,14 +25,14 @@ echo "${CYAN}Starting nuclear subtree sync...${NC}"
 # Base directory
 BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Child repositories that have ro-shared-ddl subtrees
+# Child repositories that have read-only-flyway-files subtrees
 CHILD_REPOS=("flyway-1-pipeline" "flyway-1-grants" "flyway-2-pipeline" "flyway-2-grants")
 
 # Parent repository details
 PARENT_REPO_URL="https://github.com/CleanAyers/shared-flyway-ddl.git"
 PARENT_REMOTE_NAME="parent-shared"
 PARENT_BRANCH="ro-shared-ddl"
-SUBTREE_PREFIX="ro-shared-ddl"
+SUBTREE_PREFIX="read-only-flyway-files"
 
 FAIL_COUNT=0
 
@@ -142,10 +142,10 @@ if [[ $FAIL_COUNT -eq 0 ]]; then
     
     # Perform verification diff between parent and first child
     echo ""
-    echo "${CYAN}🔍 Verification: Comparing parent shared/ with child ro-shared-ddl/${NC}"
+    echo "${CYAN}🔍 Verification: Comparing parent read-wrte-flyway-files/ with child read-only-flyway-files/${NC}"
     
-    PARENT_SHARED_DIR="${BASE_DIR}/shared-flyway-ddl/shared"
-    FIRST_CHILD_DIR="${BASE_DIR}/${CHILD_REPOS[0]}/ro-shared-ddl"
+    PARENT_SHARED_DIR="${BASE_DIR}/shared-flyway-ddl/read-wrte-flyway-files"
+    FIRST_CHILD_DIR="${BASE_DIR}/${CHILD_REPOS[0]}/read-only-flyway-files"
     
     if [[ -d "$PARENT_SHARED_DIR" && -d "$FIRST_CHILD_DIR" ]]; then
         echo "${CYAN}Comparing:${NC}"
@@ -179,12 +179,12 @@ if [[ $FAIL_COUNT -eq 0 ]]; then
     for repo in "${CHILD_REPOS[@]}"; do
         CHILD_DIR="${BASE_DIR}/${repo}"
         
-        if [[ -d "${CHILD_DIR}/.git" && -f "${CHILD_DIR}/ro-shared-ddl/sh/setup_git_hooks.sh" ]]; then
+        if [[ -d "${CHILD_DIR}/.git" && -f "${CHILD_DIR}/read-only-flyway-files/sh/setup_git_hooks.sh" ]]; then
             echo "${CYAN}-- ${repo}${NC}"
             cd "${CHILD_DIR}"
             
             # Run the setup script to install Git hooks
-            if ./ro-shared-ddl/sh/setup_git_hooks.sh; then
+            if ./read-only-flyway-files/sh/setup_git_hooks.sh; then
                 echo "  ${GREEN}✓ Git hooks installed${NC}"
             else
                 echo "  ${RED}✗ Failed to install Git hooks${NC}"

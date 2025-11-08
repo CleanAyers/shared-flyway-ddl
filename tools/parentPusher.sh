@@ -64,7 +64,7 @@ fi
 # Config
 CHILD_REPOS=("flyway-1-pipeline" "flyway-1-grants" "flyway-2-pipeline" "flyway-2-grants")
 DELIVERY_BRANCH="$PARENT_DELIVERY_BRANCH"    # parent delivery branch (now configurable)
-PREFIX_DIR="ro-shared-ddl"                   # subtree folder inside each child
+PREFIX_DIR="read-only-flyway-files"          # Updated subtree folder name inside each child
 PARENT_REMOTE_NAME="parent-shared"           # name to use inside each child for the parent remote
 PARENT_URL="$(git remote get-url origin)"
 
