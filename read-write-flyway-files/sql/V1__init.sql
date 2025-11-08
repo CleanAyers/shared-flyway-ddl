@@ -107,4 +107,4 @@ FROM sports.competitions c
 JOIN sports.teams t1 ON t1.name = 'Newcastle United'
 JOIN sports.teams t2 ON t2.name = 'Arsenal'
 WHERE c.code = 'EPL'
-ON CONFLICT DO NOTHING;
+ON CONFLICT DO NOTHING;-- Test comment for develop workflow
