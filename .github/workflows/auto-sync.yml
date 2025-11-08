@@ -50,14 +50,18 @@ jobs:
         && sudo apt install gh -y
 
     - name: 🔐 Setup GitHub CLI Authentication
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+        gh auth status
 
     - name: 🔧 Setup Git Credentials for Token Authentication
       run: |
         git config --global url."https://${GH_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
 
     - name: 📂 Clone Child Repositories
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         echo "📂 Cloning child repositories..."
         cd /home/runner/work/shared-flyway-ddl
