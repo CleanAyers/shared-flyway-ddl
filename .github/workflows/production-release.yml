@@ -29,7 +29,6 @@ jobs:
     name: Production Sync to All Child Repositories
     runs-on: ubuntu-latest
     environment: production  # Requires approval for production deployments
-    # Only run if PR was merged, not just closed
     if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
     
     steps:
@@ -38,11 +37,16 @@ jobs:
       with:
         token: ${{ secrets.PAT_TOKEN }}
         fetch-depth: 0
+        repository: CleanAyers/shared-flyway-ddl
+        ref: main
 
     - name: 🛠️ Setup Git Configuration
       run: |
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # Configure Git to use token for all GitHub operations
+        git config --global url."https://${{ secrets.PAT_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
     - name: 📦 Install GitHub CLI
       run: |
@@ -68,7 +72,7 @@ jobs:
 
     - name: 🔧 Setup Git Credentials for Token Authentication
       run: |
-        git config --global url."https://${GH_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://${{ secrets.PAT_TOKEN }}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
 
     - name: 📂 Clone Child Repositories
       env:
