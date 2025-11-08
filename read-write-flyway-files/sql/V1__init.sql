@@ -108,3 +108,11 @@ JOIN sports.teams t1 ON t1.name = 'Newcastle United'
 JOIN sports.teams t2 ON t2.name = 'Arsenal'
 WHERE c.code = 'EPL'
 ON CONFLICT DO NOTHING;-- Test comment for develop workflow
+-- Test to trigger workflow with auth fix
+-- Test to trigger workflow with auth fix Sat Nov  8 14:15:55 CST 2025
+-- Test to trigger workflow with auth fix Sat Nov  8 14:16:06 CST 2025
+-- Test workflow trigger Sat Nov  8 14:16:19 CST 2025
+-- Test workflow trigger Sat Nov  8 14:16:28 CST 2025
+-- Test workflow with auth fix Sat Nov  8 14:16:46 CST 2025
+
+-- Trigger workflow with auth fix Sat Nov  8 14:17:09 CST 2025
