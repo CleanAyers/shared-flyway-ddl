@@ -21,7 +21,7 @@ permissions:
 
 env:
   CHILD_REPOS: 'flyway-1-pipeline flyway-1-grants flyway-2-pipeline flyway-2-grants'
-  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  GH_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
 
 jobs:
   auto-sync:
@@ -51,7 +51,7 @@ jobs:
 
     - name: 🔐 Setup GitHub CLI Authentication
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
       run: |
         gh auth status
 
@@ -61,22 +61,25 @@ jobs:
 
     - name: 📂 Clone Child Repositories
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
       run: |
         echo "📂 Cloning child repositories..."
         cd /home/runner/work/shared-flyway-ddl
         
-        # Check if repositories exist first
+        # Authenticate gh explicitly so gh repo view/clone can use the token
+        echo "$GH_TOKEN" | gh auth login --with-token
+        gh auth status || { echo "❌ gh authentication failed"; gh auth status; exit 1; }
+        
         for repo in flyway-1-pipeline flyway-1-grants flyway-2-pipeline flyway-2-grants; do
-          echo "Checking if CleanAyers/$repo exists..."
-          if gh repo view "CleanAyers/$repo" >/dev/null 2>&1; then
-            echo "✅ $repo exists and is accessible"
-          else
-            echo "❌ $repo does not exist or is not accessible"
-            echo "Please create the repository at https://github.com/CleanAyers/$repo"
-            continue
+          echo "Checking CleanAyers/$repo..."
+          if ! gh repo view "CleanAyers/$repo" >/dev/null 2>&1; then
+            echo "❌ CleanAyers/$repo does not exist or gh cannot access it. Visit: https://github.com/CleanAyers/$repo"
+            echo "🔒 Note: If this is a private repository, you need to use a Personal Access Token (PAT)"
+            echo "    The default GITHUB_TOKEN cannot access other private repositories"
+            # stop early so we don't attempt partial syncs
+            exit 1
           fi
-          
+        
           if [ ! -d "$repo" ]; then
             echo "Cloning $repo..."
             if gh repo clone "CleanAyers/$repo" "$repo"; then
@@ -84,13 +87,14 @@ jobs:
             elif git clone "https://${GH_TOKEN}:x-oauth-basic@github.com/CleanAyers/$repo.git" "$repo"; then
               echo "✅ Successfully cloned $repo with git"
             else
-              echo "❌ Failed to clone $repo"
+              echo "❌ Failed to clone CleanAyers/$repo via gh and git. Check token and repo permissions."
               exit 1
             fi
           else
             echo "$repo already exists, updating..."
             cd "$repo"
-            git pull origin main || true
+            git fetch --all
+            git reset --hard origin/main || true
             cd ..
           fi
         done
