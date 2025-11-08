@@ -24,112 +24,84 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: 🛠️ Setup Git Configuration
-      run: |
-        git config --global user.name "github-actions[bot]"
-        git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-    - name: 📊 Generate Status Report
+    - name: 🔍 Check Sync Status
       id: status
       run: |
-        echo "# 📊 Repository Sync Status Report" > status_report.md
-        echo "Generated: $(date)" >> status_report.md
-        echo "" >> status_report.md
-        
-        # Run status check and capture output
-        if ./repo-tools/unified_flyway_sync.sh status > status_output.txt 2>&1; then
-          echo "✅ All repositories are in sync" >> status_report.md
-          echo "sync_status=success" >> $GITHUB_OUTPUT
+        echo "🔍 Checking repository sync status..."
+        if ./repo-tools/unified_flyway_sync.sh status; then
+          echo "sync_ok=true" >> $GITHUB_OUTPUT
         else
-          echo "⚠️ Some repositories are out of sync" >> status_report.md
-          echo "sync_status=out_of_sync" >> $GITHUB_OUTPUT
+          echo "sync_ok=false" >> $GITHUB_OUTPUT
         fi
-        
-        echo "" >> status_report.md
-        echo "## Detailed Status" >> status_report.md
-        echo '```' >> status_report.md
-        cat status_output.txt >> status_report.md
-        echo '```' >> status_report.md
-        
-        # Display status for GitHub Actions logs
-        echo "📊 Current Sync Status:"
-        cat status_output.txt
 
-    - name: 📎 Upload Status Report
-      uses: actions/upload-artifact@v4
-      with:
-        name: sync-status-report-${{ github.run_number }}
-        path: status_report.md
-        retention-days: 7
-
-    - name: 🔔 Create Issue on Sync Drift
-      if: steps.status.outputs.sync_status == 'out_of_sync'
+    - name: 🚨 Create Drift Alert Issue
+      if: steps.status.outputs.sync_ok != 'true'
       uses: actions/github-script@v7
       with:
         script: |
-          const { data: existingIssues } = await github.rest.issues.listForRepo({
+          const title = '🚨 Repository Sync Drift Detected';
+          const body = `
+          ## ⚠️ Sync Drift Alert
+          
+          **Detection Time**: ${new Date().toISOString()}
+          **Status**: Repositories are out of sync
+          
+          ### 🔧 Recommended Actions
+          1. Run manual sync: \`./repo-tools/unified_flyway_sync.sh sync --auto-commit\`
+          2. If that fails, consider nuclear reset: \`./repo-tools/unified_flyway_sync.sh nuclear\`
+          3. Check the latest workflow logs for details
+          
+          ### 📊 Status Details
+          Run \`./repo-tools/unified_flyway_sync.sh status\` for detailed information.
+          
+          ---
+          *This issue was automatically created by the sync monitoring workflow.*
+          `;
+          
+          // Check if drift issue already exists
+          const issues = await github.rest.issues.listForRepo({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            labels: ['sync-drift'],
-            state: 'open'
+            state: 'open',
+            labels: 'sync-drift'
           });
-
-          if (existingIssues.length === 0) {
-            const issueBody = `
-          ## 🚨 Repository Sync Drift Detected
-
-          **Automated monitoring has detected that some child repositories are out of sync.**
-
-          ### Quick Fix
-          Run the following command to restore sync:
-          \`\`\`bash
-          ./repo-tools/unified_flyway_sync.sh full --auto-commit
-          \`\`\`
-
-          ### Manual Trigger
-          You can also trigger auto-sync manually: [Run Auto Sync Workflow](../actions/workflows/auto-sync.yml)
-
-          ### Status Details
-          See the latest [sync status report](../actions/workflows/sync-status.yml) for detailed information.
-
-          ---
-          *This issue was automatically created by the sync monitoring system.*
-          *It will be automatically closed when all repositories are back in sync.*
-          `;
-
+          
+          if (issues.data.length === 0) {
+            // Create new drift issue
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: '🚨 Repository Sync Drift Detected',
-              body: issueBody,
+              title: title,
+              body: body,
               labels: ['sync-drift', 'automated']
             });
           }
 
-    - name: 🎯 Close Resolved Sync Issues
-      if: steps.status.outputs.sync_status == 'success'
+    - name: ✅ Close Drift Issues
+      if: steps.status.outputs.sync_ok == 'true'
       uses: actions/github-script@v7
       with:
         script: |
-          const { data: existingIssues } = await github.rest.issues.listForRepo({
+          // Close any open drift issues
+          const issues = await github.rest.issues.listForRepo({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            labels: ['sync-drift'],
-            state: 'open'
+            state: 'open',
+            labels: 'sync-drift'
           });
-
-          for (const issue of existingIssues) {
+          
+          for (const issue of issues.data) {
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: '✅ Sync status restored. All repositories are now synchronized.'
+            });
+            
             await github.rest.issues.update({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: issue.number,
               state: 'closed'
-            });
-            
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: issue.number,
-              body: '✅ **Sync drift resolved!** All repositories are now in sync. This issue has been automatically closed.'
             });
           }
