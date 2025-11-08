@@ -2,8 +2,11 @@ name: Auto Sync Child Repositories
 
 on:
   push:
+    branches: [ main ]  # Changed back to main since repositories are public
+    paths:
+      - 'read-write-flyway-files/**'
+  pull_request:
     branches: [ main ]
-    # Removed path restriction so workflow runs on any push to main
   workflow_dispatch:
     inputs:
       force_nuclear:
@@ -21,7 +24,7 @@ permissions:
 
 env:
   CHILD_REPOS: 'flyway-1-pipeline flyway-1-grants flyway-2-pipeline flyway-2-grants'
-  GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use default token for public repos
 
 jobs:
   auto-sync:
@@ -32,7 +35,7 @@ jobs:
     - name: 🔑 Checkout Parent Repository
       uses: actions/checkout@v4
       with:
-        token: ${{ secrets.PAT_TOKEN }}
+        token: ${{ secrets.GITHUB_TOKEN }}  # Use default token for public repos
         fetch-depth: 0
 
     - name: 🛠️ Setup Git Configuration
@@ -49,66 +52,56 @@ jobs:
         && sudo apt update \
         && sudo apt install gh -y
 
-    - name: 🔐 Setup GitHub CLI Authentication
+    - name: 🔐 Verify GitHub Authentication
       env:
-        GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        echo "🔍 Checking token type..."
-        if [[ "$GH_TOKEN" == github_pat_* ]]; then
-          echo "✅ Using Personal Access Token (PAT)"
-        elif [[ "$GH_TOKEN" == ghs_* ]]; then
-          echo "⚠️  Using GitHub Actions token (limited access)"
+        echo "🔍 Testing GitHub CLI authentication..."
+        gh auth status
+        
+        if [[ "$GH_TOKEN" == ghs_* ]]; then
+          echo "✅ Using GitHub Actions token (perfect for public repositories)"
+        elif [[ "$GH_TOKEN" == ghp_* ]] || [[ "$GH_TOKEN" == github_pat_* ]]; then
+          echo "✅ Using Personal Access Token"
         else
           echo "❓ Unknown token type: ${GH_TOKEN:0:10}..."
         fi
-        # GitHub CLI will automatically use GH_TOKEN environment variable
-        # No need for interactive login when GH_TOKEN is set
-        gh auth status
-
-    - name: 🔧 Setup Git Credentials for Token Authentication
-      run: |
-        git config --global url."https://${GH_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
 
     - name: 📂 Clone Child Repositories
       env:
-        GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         echo "📂 Cloning child repositories..."
         cd /home/runner/work/shared-flyway-ddl
         
-        # Verify authentication
-        gh auth status || { echo "❌ gh authentication failed"; exit 1; }
-        
         for repo in flyway-1-pipeline flyway-1-grants flyway-2-pipeline flyway-2-grants; do
           echo "Checking CleanAyers/$repo..."
-          if ! gh repo view "CleanAyers/$repo" >/dev/null 2>&1; then
-            echo "❌ CleanAyers/$repo does not exist or gh cannot access it. Visit: https://github.com/CleanAyers/$repo"
-            echo "🔒 Note: If this is a private repository, you need to use a Personal Access Token (PAT)"
-            echo "    The default GITHUB_TOKEN cannot access other private repositories"
-            # stop early so we don't attempt partial syncs
+          if gh repo view "CleanAyers/$repo" >/dev/null 2>&1; then
+            echo "✅ $repo exists and is accessible"
+          else
+            echo "❌ CleanAyers/$repo does not exist or is not accessible"
+            echo "   Please ensure the repository exists at: https://github.com/CleanAyers/$repo"
             exit 1
           fi
         
           if [ ! -d "$repo" ]; then
-            echo "Cloning $repo..."
+            echo "📥 Cloning $repo..."
             if gh repo clone "CleanAyers/$repo" "$repo"; then
-              echo "✅ Successfully cloned $repo with gh"
-            elif git clone "https://${GH_TOKEN}:x-oauth-basic@github.com/CleanAyers/$repo.git" "$repo"; then
-              echo "✅ Successfully cloned $repo with git"
+              echo "✅ Successfully cloned $repo"
             else
-              echo "❌ Failed to clone CleanAyers/$repo via gh and git. Check token and repo permissions."
+              echo "❌ Failed to clone $repo"
               exit 1
             fi
           else
-            echo "$repo already exists, updating..."
+            echo "📁 $repo already exists, updating..."
             cd "$repo"
-            git fetch --all
+            git fetch --all || true
             git reset --hard origin/main || true
             cd ..
           fi
         done
         
-        echo "✅ All accessible child repositories ready"
+        echo "✅ All child repositories ready"
 
     - name: 🔍 Check Current Sync Status
       id: initial_status
@@ -145,7 +138,7 @@ jobs:
         echo "# 🔄 Sync Report - $(date)" > sync_report.md
         echo "" >> sync_report.md
         echo "## Status Summary" >> sync_report.md
-        echo "- **Trigger**: Push to main branch" >> sync_report.md
+        echo "- **Trigger**: ${{ github.event_name }} on ${{ github.ref_name }}" >> sync_report.md
         echo "- **Commit**: ${{ github.sha }}" >> sync_report.md
         echo "- **Author**: ${{ github.actor }}" >> sync_report.md
         echo "" >> sync_report.md

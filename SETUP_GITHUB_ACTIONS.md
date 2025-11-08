@@ -1,52 +1,54 @@
-# GitHub Actions Setup for Private Repository Access
+# GitHub Actions Setup for Public Repositories
 
-## Issue: Private Repository Access
+## ✅ Current Status: Simplified Setup
 
-Your child repositories are **private**, which means GitHub Actions' default `GITHUB_TOKEN` cannot access them. You need to create a Personal Access Token (PAT).
+Your repositories are now **public**, which means GitHub Actions' default `GITHUB_TOKEN` works perfectly! No Personal Access Token (PAT) needed.
 
-## Quick Fix: Create a Personal Access Token
+## How It Works
 
-### Step 1: Create PAT
-1. Go to [GitHub Settings → Developer settings → Personal access tokens](https://github.com/settings/tokens)
-2. Click "Generate new token (classic)"
-3. Give it a name like "Flyway Sync Workflow"
-4. Select scopes:
-   - ✅ `repo` (Full repository access)
-   - ✅ `workflow` (Update GitHub Actions workflows)
-5. Set expiration (recommend 90 days minimum)
-6. Click "Generate token"
-7. **Copy the token immediately** (you won't see it again)
+### Default GitHub Token
+- The workflow uses `${{ secrets.GITHUB_TOKEN }}` 
+- This token automatically has access to public repositories
+- No additional setup required
 
-### Step 2: Add Token to Repository Secrets
-1. Go to your repository: `https://github.com/CleanAyers/shared-flyway-ddl`
-2. Go to Settings → Secrets and variables → Actions
-3. Click "New repository secret"
-4. Name: `PAT_TOKEN`
-5. Value: Paste your token from Step 1
-6. Click "Add secret"
+### Repository Status
+- ✅ `CleanAyers/shared-flyway-ddl` - **Public**
+- ✅ `CleanAyers/flyway-1-pipeline` - **Public** 
+- ✅ `CleanAyers/flyway-1-grants` - **Public**
+- ✅ `CleanAyers/flyway-2-pipeline` - **Public**
+- ✅ `CleanAyers/flyway-2-grants` - **Public**
 
-### Step 3: Test the Workflow
-1. Make any small commit to trigger the workflow
-2. The workflow will now use your PAT to access private repositories
+## Workflow Triggers
+The auto-sync workflow runs when:
+- **Push to main branch** with changes in `read-write-flyway-files/**`
+- **Pull requests** to main branch
+- **Manual trigger** via workflow_dispatch
 
-## Alternative: Make Repositories Public
-If you don't want to manage PATs, you could make the child repositories public:
-- `CleanAyers/flyway-1-pipeline`
-- `CleanAyers/flyway-1-grants` 
-- `CleanAyers/flyway-2-pipeline`
-- `CleanAyers/flyway-2-grants`
-
-## Current Status
-- ✅ All repositories exist
-- ❌ They are private (GitHub Actions can't access them with default token)
-- ✅ Workflow updated to use PAT_TOKEN when available
-- ⏳ Need to create and add PAT_TOKEN secret
-
-## Verification
-After adding the PAT_TOKEN, your next workflow run should show:
+## Expected Workflow Output
+Your workflow should now show:
 ```
-✅ Successfully cloned flyway-1-pipeline with gh
-✅ Successfully cloned flyway-1-grants with gh  
-✅ Successfully cloned flyway-2-pipeline with gh
-✅ Successfully cloned flyway-2-grants with gh
+🔍 Testing GitHub CLI authentication...
+✅ Using GitHub Actions token (perfect for public repositories)
+✅ flyway-1-pipeline exists and is accessible
+✅ flyway-1-grants exists and is accessible  
+✅ flyway-2-pipeline exists and is accessible
+✅ flyway-2-grants exists and is accessible
 ```
+
+## Troubleshooting
+
+### If repositories can't be found:
+1. Verify all repositories are **public** on GitHub
+2. Check repository names match exactly: `flyway-1-pipeline`, `flyway-1-grants`, etc.
+3. Ensure repositories exist at: `https://github.com/CleanAyers/[repo-name]`
+
+### If you need private repositories in the future:
+1. Create a Personal Access Token with `repo` scope
+2. Add it as `PAT_TOKEN` repository secret
+3. Update workflow to use `${{ secrets.PAT_TOKEN }}` instead of `${{ secrets.GITHUB_TOKEN }}`
+
+## Current Configuration
+- **Workflow file**: `.github/workflows/auto-sync.yml`
+- **Token type**: GitHub Actions token (default)
+- **Access level**: Public repositories only
+- **Setup complexity**: Zero - works out of the box! 🎉
