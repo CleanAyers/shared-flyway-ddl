@@ -37,11 +37,16 @@ jobs:
       with:
         token: ${{ secrets.PAT_TOKEN }}
         fetch-depth: 0
+        repository: CleanAyers/shared-flyway-ddl
+        ref: main
 
     - name: 🛠️ Setup Git Configuration
       run: |
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # Configure Git to use token for all GitHub operations
+        git config --global url."https://${{ secrets.PAT_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
     - name: 📦 Install GitHub CLI
       run: |
