@@ -103,6 +103,52 @@ jobs:
         
         echo "✅ All child repositories ready"
 
+    - name: 🔐 Configure Git Authentication for All Repositories
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        echo "🔐 Setting up Git authentication for push operations..."
+        
+        # Configure authentication for parent repository
+        cd /home/runner/work/shared-flyway-ddl/shared-flyway-ddl
+        git remote set-url origin https://x-access-token:${GH_TOKEN}@github.com/CleanAyers/shared-flyway-ddl.git
+        echo "✅ Configured auth for parent repository"
+        
+        # Configure authentication for all child repositories
+        cd /home/runner/work/shared-flyway-ddl
+        for repo in flyway-1-pipeline flyway-1-grants flyway-2-pipeline flyway-2-grants; do
+          if [ -d "$repo" ]; then
+            echo "🔑 Configuring auth for $repo..."
+            cd "$repo"
+            git remote set-url origin https://x-access-token:${GH_TOKEN}@github.com/CleanAyers/$repo.git
+            echo "✅ Configured auth for $repo"
+            cd ..
+          else
+            echo "⚠️  Directory $repo not found, skipping auth setup"
+          fi
+        done
+        
+        # Verify authentication is working
+        echo "🧪 Testing push authentication..."
+        cd /home/runner/work/shared-flyway-ddl/shared-flyway-ddl
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # Create a test file to verify push works
+        echo "# Auth test $(date)" > auth_test.tmp
+        git add auth_test.tmp
+        git commit -m "test: verify push authentication works" || echo "No changes to commit (this is fine)"
+        if git push origin main; then
+          echo "✅ Push authentication verified successfully"
+          # Clean up test file
+          git rm auth_test.tmp || true
+          git commit -m "cleanup: remove auth test file" || true
+          git push origin main || true
+        else
+          echo "❌ Push authentication failed"
+          exit 1
+        fi
+
     - name: 🔍 Check Current Sync Status
       id: initial_status
       run: |
@@ -110,12 +156,16 @@ jobs:
         ./repo-tools/unified_flyway_sync.sh status || echo "status_check_failed=true" >> $GITHUB_OUTPUT
 
     - name: 📤 Publish Shared Content to Delivery Branch
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         echo "📤 Publishing shared content to delivery branch..."
         ./repo-tools/unified_flyway_sync.sh publish
 
     - name: 🔄 Sync Child Repositories
       id: sync
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         echo "🔄 Syncing child repositories..."
         if ./repo-tools/unified_flyway_sync.sh sync --auto-commit; then
