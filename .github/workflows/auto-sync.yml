@@ -21,7 +21,7 @@ permissions:
 
 env:
   CHILD_REPOS: 'flyway-1-pipeline flyway-1-grants flyway-2-pipeline flyway-2-grants'
-  GH_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+  GH_TOKEN: ${{ secrets.PAT_TOKEN }}
 
 jobs:
   auto-sync:
@@ -32,7 +32,7 @@ jobs:
     - name: 🔑 Checkout Parent Repository
       uses: actions/checkout@v4
       with:
-        token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.PAT_TOKEN }}
         fetch-depth: 0
 
     - name: 🛠️ Setup Git Configuration
@@ -51,7 +51,7 @@ jobs:
 
     - name: 🔐 Setup GitHub CLI Authentication
       env:
-        GH_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.PAT_TOKEN }}
       run: |
         echo "🔍 Checking token type..."
         if [[ "$GH_TOKEN" == github_pat_* ]]; then
@@ -61,6 +61,7 @@ jobs:
         else
           echo "❓ Unknown token type: ${GH_TOKEN:0:10}..."
         fi
+        echo "$GH_TOKEN" | gh auth login --with-token
         gh auth status
 
     - name: 🔧 Setup Git Credentials for Token Authentication
@@ -69,14 +70,13 @@ jobs:
 
     - name: 📂 Clone Child Repositories
       env:
-        GH_TOKEN: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.PAT_TOKEN }}
       run: |
         echo "📂 Cloning child repositories..."
         cd /home/runner/work/shared-flyway-ddl
         
-        # Authenticate gh explicitly so gh repo view/clone can use the token
-        echo "$GH_TOKEN" | gh auth login --with-token
-        gh auth status || { echo "❌ gh authentication failed"; gh auth status; exit 1; }
+        # Verify authentication
+        gh auth status || { echo "❌ gh authentication failed"; exit 1; }
         
         for repo in flyway-1-pipeline flyway-1-grants flyway-2-pipeline flyway-2-grants; do
           echo "Checking CleanAyers/$repo..."
