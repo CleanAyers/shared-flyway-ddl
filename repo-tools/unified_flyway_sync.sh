@@ -103,6 +103,89 @@ echo "${CYAN}Target path:${NC} $CHILD_SUBTREE_PATH"
 echo
 
 # =============================================================================
+# FUNCTION: Ensure clean Git state for all repositories
+# =============================================================================
+ensure_git_hygiene() {
+    echo "${BOLD}${CYAN}🧹 ENSURING GIT HYGIENE${NC}"
+    
+    # 1. Clean parent repository first
+    cd "$PARENT_DIR"
+    echo "${CYAN}-- Parent: shared-flyway-ddl${NC}"
+    
+    # Pull latest from origin
+    git fetch --all --prune >/dev/null 2>&1 || true
+    git switch main >/dev/null 2>&1 || true
+    
+    # Auto-commit any pending changes
+    if [[ -n "$(git status --porcelain)" ]]; then
+        echo "  ${YEL}AUTO-COMMIT:${NC} Committing pending changes..."
+        git add -A
+        git commit -m "chore: auto-commit before sync operation ($(date +%Y-%m-%d))"
+    fi
+    
+    # Pull latest changes
+    echo "  ${CYAN}PULL:${NC} Updating from origin..."
+    git pull --ff-only origin main || {
+        echo "  ${RED}ERROR:${NC} Cannot fast-forward pull. Manual intervention needed."
+        return 1
+    }
+    
+    # Push any local commits
+    if [[ "$(git rev-list --count origin/main..main)" -gt 0 ]]; then
+        echo "  ${CYAN}PUSH:${NC} Pushing local commits..."
+        git push origin main
+    fi
+    
+    echo "  ${GREEN}✓ Parent repository clean${NC}"
+    
+    # 2. Clean all child repositories
+    for repo in "${CHILD_REPOS[@]}"; do
+        CHILD_DIR="$BASE_DIR/$repo"
+        echo "${CYAN}-- Child: $repo${NC}"
+        
+        # Clone if missing
+        if [[ ! -d "$CHILD_DIR/.git" ]]; then
+            echo "  ${YEL}CLONE:${NC} Repository not found, cloning..."
+            gh repo clone "CleanAyers/$repo" "$CHILD_DIR" || {
+                echo "  ${RED}ERROR:${NC} Failed to clone repository"
+                return 1
+            }
+        fi
+        
+        cd "$CHILD_DIR"
+        
+        # Pull latest from origin
+        git fetch --all --prune >/dev/null 2>&1 || true
+        git switch "$CHILD_BRANCH" >/dev/null 2>&1 || true
+        
+        # Auto-commit any pending changes
+        if [[ -n "$(git status --porcelain)" ]]; then
+            echo "  ${YEL}AUTO-COMMIT:${NC} Committing pending changes..."
+            git add -A
+            git commit -m "chore: auto-commit before sync operation ($(date +%Y-%m-%d))"
+        fi
+        
+        # Pull latest changes
+        echo "  ${CYAN}PULL:${NC} Updating from origin..."
+        git pull --ff-only origin "$CHILD_BRANCH" || {
+            echo "  ${RED}ERROR:${NC} Cannot fast-forward pull. Manual intervention needed."
+            return 1
+        }
+        
+        # Push any local commits
+        if [[ "$(git rev-list --count origin/$CHILD_BRANCH..$CHILD_BRANCH)" -gt 0 ]]; then
+            echo "  ${CYAN}PUSH:${NC} Pushing local commits..."
+            git push origin "$CHILD_BRANCH"
+        fi
+        
+        echo "  ${GREEN}✓ Child repository clean${NC}"
+    done
+    
+    echo "${GREEN}✅ ALL REPOSITORIES HAVE CLEAN GIT HYGIENE${NC}"
+    echo
+}
+
+# =============================================================================
 # FUNCTION: Publish parent content to delivery branch
 # =============================================================================
 publish_shared() {
@@ -433,6 +516,14 @@ status_check() {
 # =============================================================================
 # MAIN EXECUTION
 # =============================================================================
+
+# Always ensure Git hygiene first (except for status which is read-only)
+if [[ "$OPERATION" != "status" ]]; then
+    ensure_git_hygiene || {
+        echo "${RED}ERROR: Git hygiene failed. Cannot proceed safely.${NC}"
+        exit 1
+    }
+fi
 
 case "$OPERATION" in
     "publish")
