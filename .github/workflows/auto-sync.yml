@@ -61,7 +61,8 @@ jobs:
         else
           echo "❓ Unknown token type: ${GH_TOKEN:0:10}..."
         fi
-        echo "$GH_TOKEN" | gh auth login --with-token
+        # GitHub CLI will automatically use GH_TOKEN environment variable
+        # No need for interactive login when GH_TOKEN is set
         gh auth status
 
     - name: 🔧 Setup Git Credentials for Token Authentication
