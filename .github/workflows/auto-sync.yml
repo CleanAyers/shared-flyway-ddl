@@ -134,14 +134,14 @@ jobs:
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
         
-        # Create a test file to verify push works
-        echo "# Auth test $(date)" > auth_test.tmp
-        git add auth_test.tmp
+        # Create a test file that won't be ignored by .gitignore
+        echo "# Auth test $(date)" > auth_test_file.txt
+        git add auth_test_file.txt
         git commit -m "test: verify push authentication works" || echo "No changes to commit (this is fine)"
         if git push origin main; then
           echo "✅ Push authentication verified successfully"
           # Clean up test file
-          git rm auth_test.tmp || true
+          git rm auth_test_file.txt || true
           git commit -m "cleanup: remove auth test file" || true
           git push origin main || true
         else
