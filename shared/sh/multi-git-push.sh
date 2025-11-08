@@ -5,7 +5,7 @@ set -euo pipefail
 # Usage:
 #   ./multi_git_push.sh --msg "chore: sync" [--base /path/to/Flyway-Repo-Structure] [--branch main] [--pull-first] [--include-parent] [--only CHILD1 CHILD2 ...]
 
-BASE_DIR="${HOME}/Flyway-Repo-Structure"
+BASE_DIR="${HOME}/Documents/Codex/Work/Flyway-Repo-Structure"
 BRANCH="main"
 MSG=""
 PULL_FIRST=0

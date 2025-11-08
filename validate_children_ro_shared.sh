@@ -5,15 +5,21 @@ set -euo pipefail
 # Usage:
 #   ./validate_children_ro_shared.sh
 #   ./validate_children_ro_shared.sh --fix
+#   ./validate_children_ro_shared.sh --fix --auto-commit
+#   ./validate_children_ro_shared.sh --fix --auto-stash
 #   ./validate_children_ro_shared.sh --fix --base "/path/to/children" --child-branch main
 
 FIX=0
 BASE_OVERRIDE=""
 CHILD_BRANCH="main"
+AUTO_COMMIT=0
+AUTO_STASH=0
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --fix) FIX=1; shift;;
+    --auto-commit) AUTO_COMMIT=1; shift;;
+    --auto-stash) AUTO_STASH=1; shift;;
     --base) 
       if [[ $# -lt 2 ]]; then
         echo "ERROR: --base requires a value"; exit 2
@@ -27,6 +33,12 @@ while [[ $# -gt 0 ]]; do
     *) echo "Unknown arg: $1"; exit 2;;
   esac
 done
+
+# Validate conflicting options
+if [[ $AUTO_COMMIT -eq 1 && $AUTO_STASH -eq 1 ]]; then
+  echo "ERROR: Cannot use both --auto-commit and --auto-stash"
+  exit 2
+fi
 
 # Colors
 RED=$'\033[31m'; GREEN=$'\033[32m'; YEL=$'\033[33m'; CYAN=$'\033[36m'; NC=$'\033[0m'
@@ -83,10 +95,23 @@ for repo in "${CHILD_REPOS[@]}"; do
 
   cd "${CHILD_DIR}"
 
-  # Safety: ensure clean tree
+  # Safety: ensure clean tree or handle automatically
   if [[ -n "$(git status --porcelain)" ]]; then
-    echo "  ${RED}ERROR:${NC} working tree not clean. Commit/stash changes, then rerun."
-    FAIL=1; echo; continue
+    if [[ $AUTO_COMMIT -eq 1 ]]; then
+      echo "  ${YEL}WARN:${NC} working tree dirty, auto-committing changes..."
+      git add -A
+      git commit -m "chore: auto-commit changes before shared sync"
+    elif [[ $AUTO_STASH -eq 1 ]]; then
+      echo "  ${YEL}WARN:${NC} working tree dirty, stashing changes..."
+      git stash push -m "auto-stash before shared sync $(date +%Y%m%d-%H%M%S)"
+    else
+      echo "  ${RED}ERROR:${NC} working tree not clean. Options:"
+      echo "    1. Commit changes: git add -A && git commit -m 'your message'"
+      echo "    2. Stash changes: git stash"
+      echo "    3. Use --auto-commit to auto-commit"
+      echo "    4. Use --auto-stash to auto-stash"
+      FAIL=1; echo; continue
+    fi
   fi
 
   git fetch --all --tags --prune >/dev/null 2>&1 || true
