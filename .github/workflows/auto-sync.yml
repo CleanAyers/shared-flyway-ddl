@@ -3,8 +3,7 @@ name: Auto Sync Child Repositories
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'read-write-flyway-files/**'
+    # Removed path restriction so workflow runs on any push to main
   workflow_dispatch:
     inputs:
       force_nuclear:
@@ -13,8 +12,16 @@ on:
         default: false
         type: boolean
 
+# Add proper permissions for GitHub Actions
+permissions:
+  contents: write          # Allow pushing to branches
+  pull-requests: write     # Allow creating/updating PRs
+  issues: write           # Allow creating issues for failed syncs
+  actions: read           # Allow reading workflow status
+
 env:
   CHILD_REPOS: 'flyway-1-pipeline flyway-1-grants flyway-2-pipeline flyway-2-grants'
+  GH_TOKEN: ${{ secrets.PAT_TOKEN }}
 
 jobs:
   auto-sync:
@@ -25,7 +32,7 @@ jobs:
     - name: 🔑 Checkout Parent Repository
       uses: actions/checkout@v4
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+        token: ${{ secrets.PAT_TOKEN }}
         fetch-depth: 0
 
     - name: 🛠️ Setup Git Configuration
@@ -33,45 +40,107 @@ jobs:
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-    - name: 📊 Check Sync Status
-      id: status
+    - name: 📦 Install GitHub CLI
+      run: |
+        type -p curl >/dev/null || sudo apt update && sudo apt install curl -y
+        curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+        && sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+        && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null \
+        && sudo apt update \
+        && sudo apt install gh -y
+
+    - name: 🔐 Setup GitHub CLI Authentication
+      env:
+        GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+      run: |
+        echo "🔍 Checking token type..."
+        if [[ "$GH_TOKEN" == github_pat_* ]]; then
+          echo "✅ Using Personal Access Token (PAT)"
+        elif [[ "$GH_TOKEN" == ghs_* ]]; then
+          echo "⚠️  Using GitHub Actions token (limited access)"
+        else
+          echo "❓ Unknown token type: ${GH_TOKEN:0:10}..."
+        fi
+        # GitHub CLI will automatically use GH_TOKEN environment variable
+        # No need for interactive login when GH_TOKEN is set
+        gh auth status
+
+    - name: 🔧 Setup Git Credentials for Token Authentication
+      run: |
+        git config --global url."https://${GH_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
+
+    - name: 📂 Clone Child Repositories
+      env:
+        GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+      run: |
+        echo "📂 Cloning child repositories..."
+        cd /home/runner/work/shared-flyway-ddl
+        
+        # Verify authentication
+        gh auth status || { echo "❌ gh authentication failed"; exit 1; }
+        
+        for repo in flyway-1-pipeline flyway-1-grants flyway-2-pipeline flyway-2-grants; do
+          echo "Checking CleanAyers/$repo..."
+          if ! gh repo view "CleanAyers/$repo" >/dev/null 2>&1; then
+            echo "❌ CleanAyers/$repo does not exist or gh cannot access it. Visit: https://github.com/CleanAyers/$repo"
+            echo "🔒 Note: If this is a private repository, you need to use a Personal Access Token (PAT)"
+            echo "    The default GITHUB_TOKEN cannot access other private repositories"
+            # stop early so we don't attempt partial syncs
+            exit 1
+          fi
+        
+          if [ ! -d "$repo" ]; then
+            echo "Cloning $repo..."
+            if gh repo clone "CleanAyers/$repo" "$repo"; then
+              echo "✅ Successfully cloned $repo with gh"
+            elif git clone "https://${GH_TOKEN}:x-oauth-basic@github.com/CleanAyers/$repo.git" "$repo"; then
+              echo "✅ Successfully cloned $repo with git"
+            else
+              echo "❌ Failed to clone CleanAyers/$repo via gh and git. Check token and repo permissions."
+              exit 1
+            fi
+          else
+            echo "$repo already exists, updating..."
+            cd "$repo"
+            git fetch --all
+            git reset --hard origin/main || true
+            cd ..
+          fi
+        done
+        
+        echo "✅ All accessible child repositories ready"
+
+    - name: 🔍 Check Current Sync Status
+      id: initial_status
       run: |
         echo "🔍 Checking current sync status..."
         ./repo-tools/unified_flyway_sync.sh status || echo "status_check_failed=true" >> $GITHUB_OUTPUT
-        
-    - name: 📤 Publish Parent Content
+
+    - name: 📤 Publish Shared Content to Delivery Branch
       run: |
         echo "📤 Publishing shared content to delivery branch..."
         ./repo-tools/unified_flyway_sync.sh publish
 
-    - name: 🔄 Sync All Children
+    - name: 🔄 Sync Child Repositories
       id: sync
       run: |
-        echo "🔄 Starting automatic sync of all child repositories..."
+        echo "🔄 Syncing child repositories..."
         if ./repo-tools/unified_flyway_sync.sh sync --auto-commit; then
           echo "sync_success=true" >> $GITHUB_OUTPUT
-          echo "✅ Normal sync completed successfully"
         else
           echo "sync_success=false" >> $GITHUB_OUTPUT
-          echo "❌ Normal sync failed"
-          exit 1
+          if [[ "${{ github.event.inputs.force_nuclear }}" == "true" ]]; then
+            echo "🚨 Normal sync failed, attempting nuclear reset..."
+            ./repo-tools/unified_flyway_sync.sh nuclear --auto-commit
+          fi
         fi
 
-    - name: ☢️ Nuclear Reset (if normal sync failed)
-      if: failure() && github.event.inputs.force_nuclear == 'true'
-      run: |
-        echo "☢️ Normal sync failed, attempting nuclear reset..."
-        echo "⚠️ This will overwrite any local changes in child repositories"
-        ./repo-tools/unified_flyway_sync.sh nuclear --force-nuclear
-
-    - name: 📊 Final Status Verification
-      if: always()
+    - name: 📊 Verify Final Sync Status
       run: |
         echo "📊 Verifying final sync status..."
         ./repo-tools/unified_flyway_sync.sh status
 
-    - name: 📝 Create Sync Report
-      if: always()
+    - name: 📝 Generate Sync Report
       run: |
         echo "# 🔄 Sync Report - $(date)" > sync_report.md
         echo "" >> sync_report.md
@@ -94,15 +163,14 @@ jobs:
         echo '```' >> sync_report.md
 
     - name: 📎 Upload Sync Report
-      if: always()
       uses: actions/upload-artifact@v4
       with:
         name: sync-report-${{ github.run_number }}
         path: sync_report.md
         retention-days: 30
 
-    - name: 🚨 Notify on Failure
-      if: failure()
+    - name: 🚨 Handle Sync Failure
+      if: steps.sync.outputs.sync_success != 'true'
       run: |
         echo "🚨 SYNC FAILURE DETECTED"
         echo "❌ Automatic synchronization failed for commit ${{ github.sha }}"
@@ -112,3 +180,4 @@ jobs:
         echo "Quick fix commands:"
         echo "  ./repo-tools/unified_flyway_sync.sh sync --auto-commit"
         echo "  ./repo-tools/unified_flyway_sync.sh nuclear  # (if needed)"
+        exit 1
