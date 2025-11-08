@@ -42,8 +42,6 @@ jobs:
       with:
         token: ${{ secrets.PAT_TOKEN }}
         fetch-depth: 0
-        repository: CleanAyers/shared-flyway-ddl
-        ref: main
 
     - name: 🛠️ Setup Git Configuration
       run: |
