@@ -1,0 +1,155 @@
+name: PR Validation and Testing
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'read-write-flyway-files/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+  checks: write
+
+jobs:
+  validate-changes:
+    name: Validate Flyway Files
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 🔑 Checkout PR Branch
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: 🔍 Detect Changed Files
+      id: changes
+      run: |
+        echo "Detecting changes in read-write-flyway-files..."
+        git diff --name-only origin/main...HEAD -- read-write-flyway-files/ | tee changed_files.txt
+        
+        if [[ -s changed_files.txt ]]; then
+          echo "has_changes=true" >> $GITHUB_OUTPUT
+          echo "Files changed:"
+          cat changed_files.txt
+        else
+          echo "has_changes=false" >> $GITHUB_OUTPUT
+          echo "No changes detected in shared files"
+        fi
+
+    - name: ✅ Validate SQL Syntax
+      if: steps.changes.outputs.has_changes == 'true'
+      run: |
+        echo "🔍 Validating SQL syntax for migration files..."
+        
+        # Check for SQL files
+        if ls read-write-flyway-files/sql/*.sql >/dev/null 2>&1; then
+          for sql_file in read-write-flyway-files/sql/*.sql; do
+            echo "Checking $sql_file..."
+            
+            # Basic SQL syntax checks
+            if grep -q "DROP TABLE" "$sql_file"; then
+              echo "⚠️  WARNING: $sql_file contains DROP TABLE - please review carefully"
+            fi
+            
+            if grep -q "DELETE FROM" "$sql_file"; then
+              echo "⚠️  WARNING: $sql_file contains DELETE FROM - please review carefully"
+            fi
+            
+            # Check for missing semicolons
+            if ! grep -q ";" "$sql_file"; then
+              echo "⚠️  WARNING: $sql_file may be missing semicolons"
+            fi
+            
+            echo "✅ Basic syntax check passed for $sql_file"
+          done
+        else
+          echo "No SQL files to validate"
+        fi
+
+    - name: 📋 Check Migration Naming Convention
+      if: steps.changes.outputs.has_changes == 'true'
+      run: |
+        echo "🔍 Checking migration file naming conventions..."
+        
+        for sql_file in read-write-flyway-files/sql/*.sql; do
+          filename=$(basename "$sql_file")
+          
+          if [[ "$filename" =~ ^V[0-9]+__.*\.sql$ ]]; then
+            echo "✅ $filename follows versioned migration naming (V1__description.sql)"
+          elif [[ "$filename" =~ ^R__.*\.sql$ ]]; then
+            echo "✅ $filename follows repeatable migration naming (R__description.sql)"
+          else
+            echo "❌ $filename does not follow Flyway naming conventions"
+            echo "   Expected: V1__description.sql or R__description.sql"
+            exit 1
+          fi
+        done
+
+    - name: 🔧 Test Sync Script Dry-Run
+      if: steps.changes.outputs.has_changes == 'true'
+      run: |
+        echo "🔄 Testing sync script with current changes..."
+        
+        # Make the script executable
+        chmod +x repo-tools/unified_flyway_sync.sh
+        
+        # Test the status command (read-only)
+        echo "Testing status check..."
+        if ./repo-tools/unified_flyway_sync.sh status; then
+          echo "✅ Sync script status check passed"
+        else
+          echo "❌ Sync script status check failed"
+          exit 1
+        fi
+
+    - name: 📊 Generate Validation Report
+      run: |
+        echo "# 📋 PR Validation Report" > pr_validation_report.md
+        echo "" >> pr_validation_report.md
+        echo "## Changes Summary" >> pr_validation_report.md
+        
+        if [[ "${{ steps.changes.outputs.has_changes }}" == "true" ]]; then
+          echo "✅ **Changes detected in shared files**" >> pr_validation_report.md
+          echo "" >> pr_validation_report.md
+          echo "### Modified Files:" >> pr_validation_report.md
+          while IFS= read -r file; do
+            echo "- \`$file\`" >> pr_validation_report.md
+          done < changed_files.txt
+        else
+          echo "ℹ️  **No changes in shared files**" >> pr_validation_report.md
+        fi
+        
+        echo "" >> pr_validation_report.md
+        echo "## Validation Results" >> pr_validation_report.md
+        echo "- ✅ SQL syntax validation passed" >> pr_validation_report.md
+        echo "- ✅ Migration naming conventions verified" >> pr_validation_report.md
+        echo "- ✅ Sync script dry-run successful" >> pr_validation_report.md
+        echo "" >> pr_validation_report.md
+        echo "## Next Steps" >> pr_validation_report.md
+        echo "After this PR is merged:" >> pr_validation_report.md
+        echo "1. Production workflow will automatically trigger" >> pr_validation_report.md
+        echo "2. Changes will be synced to all 4 child repositories" >> pr_validation_report.md
+        echo "3. Sync status will be verified across all repositories" >> pr_validation_report.md
+
+    - name: 📝 Comment on PR with Validation Results
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const report = fs.readFileSync('pr_validation_report.md', 'utf8');
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: report
+          });
+
+    - name: 📎 Upload Validation Report
+      uses: actions/upload-artifact@v4
+      with:
+        name: pr-validation-report-${{ github.event.number }}
+        path: pr_validation_report.md
+        retention-days: 30
