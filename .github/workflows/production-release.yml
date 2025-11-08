@@ -1,7 +1,8 @@
 name: Production Release to Main
 
 on:
-  push:
+  pull_request:
+    types: [closed]
     branches: [ main ]
     paths:
       - 'read-write-flyway-files/**'
@@ -28,6 +29,8 @@ jobs:
     name: Production Sync to All Child Repositories
     runs-on: ubuntu-latest
     environment: production  # Requires approval for production deployments
+    # Only run if PR was merged, not just closed
+    if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
     
     steps:
     - name: 🔑 Checkout Parent Repository
