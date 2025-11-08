@@ -15,6 +15,36 @@ that ensure consistency and governance across all cluster-specific Flyway reposi
 
 ---
 
+## 🚀 Quick Start
+
+### First Time Setup (Parent Repository)
+1. **Clone this repository**
+2. **Set up Git aliases** (already configured):
+   ```bash
+   git config alias.pubshared '!f(){ git switch main && git pull --ff-only && ...; }; f'
+   ```
+3. **Install Git hooks in all child repositories**:
+   ```bash
+   ./shared/sh/setup_git_hooks.sh
+   ```
+
+### Daily Workflow
+1. **Edit files** in the `shared/` directory
+2. **Commit and push** changes:
+   ```bash
+   git add -A && git commit -m "your message" && git push
+   ```
+3. **Publish to children**:
+   ```bash
+   git pubshared
+   ```
+4. **Sync all children**:
+   ```bash
+   ./validate_children_ro_shared.sh --fix --auto-commit
+   ```
+
+---
+
 ## 🧩 Architecture Overview
 ```
 Flyway-Repo-Structure/
@@ -99,4 +129,3 @@ git config alias.syncshared '!git fetch parent-shared ro-shared-ddl && git subtr
 3. In parent: `git pubshared`
 4. In each child: `git syncshared`
    1. or run ./validate_children_ro_shared.sh --fix from parent
-  
