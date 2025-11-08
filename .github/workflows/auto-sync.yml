@@ -21,6 +21,7 @@ permissions:
 
 env:
   CHILD_REPOS: 'flyway-1-pipeline flyway-1-grants flyway-2-pipeline flyway-2-grants'
+  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   auto-sync:
@@ -52,19 +53,36 @@ jobs:
       run: |
         echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
+    - name: 🔧 Setup Git Credentials for Token Authentication
+      run: |
+        git config --global url."https://${GH_TOKEN}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
+
     - name: 📂 Clone Child Repositories
       run: |
         echo "📂 Cloning child repositories..."
         cd /home/runner/work/shared-flyway-ddl
         
-        # Clone each child repository
+        # Check if repositories exist first
         for repo in flyway-1-pipeline flyway-1-grants flyway-2-pipeline flyway-2-grants; do
+          echo "Checking if CleanAyers/$repo exists..."
+          if gh repo view "CleanAyers/$repo" >/dev/null 2>&1; then
+            echo "✅ $repo exists and is accessible"
+          else
+            echo "❌ $repo does not exist or is not accessible"
+            echo "Please create the repository at https://github.com/CleanAyers/$repo"
+            continue
+          fi
+          
           if [ ! -d "$repo" ]; then
             echo "Cloning $repo..."
-            gh repo clone "CleanAyers/$repo" "$repo" || {
-              echo "Failed to clone $repo, trying with git..."
-              git clone "https://github.com/CleanAyers/$repo.git" "$repo"
-            }
+            if gh repo clone "CleanAyers/$repo" "$repo"; then
+              echo "✅ Successfully cloned $repo with gh"
+            elif git clone "https://${GH_TOKEN}:x-oauth-basic@github.com/CleanAyers/$repo.git" "$repo"; then
+              echo "✅ Successfully cloned $repo with git"
+            else
+              echo "❌ Failed to clone $repo"
+              exit 1
+            fi
           else
             echo "$repo already exists, updating..."
             cd "$repo"
@@ -73,7 +91,7 @@ jobs:
           fi
         done
         
-        echo "✅ All child repositories ready"
+        echo "✅ All accessible child repositories ready"
 
     - name: 🔍 Check Current Sync Status
       id: initial_status
