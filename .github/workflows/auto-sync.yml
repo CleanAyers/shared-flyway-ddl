@@ -24,7 +24,7 @@ permissions:
 
 env:
   CHILD_REPOS: 'flyway-1-pipeline flyway-1-grants flyway-2-pipeline flyway-2-grants'
-  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Use default token for public repos
+  GH_TOKEN: ${{ secrets.GH_TOKEN }}  # Use your new PAT token
 
 jobs:
   auto-sync:
@@ -35,7 +35,7 @@ jobs:
     - name: 🔑 Checkout Parent Repository
       uses: actions/checkout@v4
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}  # Use default token for public repos
+        token: ${{ secrets.GH_TOKEN }}  # Use your new PAT token
         fetch-depth: 0
 
     - name: 🛠️ Setup Git Configuration
@@ -54,7 +54,7 @@ jobs:
 
     - name: 🔐 Verify GitHub Authentication
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
       run: |
         echo "🔍 Testing GitHub CLI authentication..."
         gh auth status
@@ -69,7 +69,7 @@ jobs:
 
     - name: 📂 Clone Child Repositories
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
       run: |
         echo "📂 Cloning child repositories..."
         cd /home/runner/work/shared-flyway-ddl
@@ -105,7 +105,7 @@ jobs:
 
     - name: 🔐 Configure Git Authentication for All Repositories
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
       run: |
         echo "🔐 Setting up Git authentication for push operations..."
         
@@ -157,7 +157,7 @@ jobs:
 
     - name: 📤 Publish Shared Content to Delivery Branch
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
       run: |
         echo "📤 Publishing shared content to delivery branch..."
         ./repo-tools/unified_flyway_sync.sh publish
@@ -165,7 +165,7 @@ jobs:
     - name: 🔄 Sync Child Repositories
       id: sync
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.GH_TOKEN }}
       run: |
         echo "🔄 Syncing child repositories..."
         if ./repo-tools/unified_flyway_sync.sh sync --auto-commit; then
