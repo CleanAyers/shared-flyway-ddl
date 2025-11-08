@@ -3,8 +3,7 @@ name: Auto Sync Child Repositories
 on:
   push:
     branches: [ main ]
-    paths:
-      - 'read-write-flyway-files/**'
+    # Removed path restriction so workflow runs on any push to main
   workflow_dispatch:
     inputs:
       force_nuclear:
