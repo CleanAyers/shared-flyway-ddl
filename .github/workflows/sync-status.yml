@@ -11,7 +11,6 @@ permissions:
   contents: read           # Allow reading repository contents
   issues: write           # Allow creating/closing sync drift issues
   actions: read           # Allow reading workflow status
-  metadata: read          # Allow reading repository metadata
 
 jobs:
   check-status:
