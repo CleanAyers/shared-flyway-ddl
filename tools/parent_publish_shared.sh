@@ -3,8 +3,8 @@ set -euo pipefail
 
 REMOTE=origin
 SRC_BRANCH=main
-SRC_PATH=shared          # your shared files now live directly under shared/
-DELIVERY=ro-shared-ddl   # delivery branch
+SRC_PATH=read-wrte-flyway-files    # Updated folder name
+DELIVERY=ro-shared-ddl             # delivery branch
 
 echo "== Parent: publish ${SRC_PATH}/ → ${DELIVERY} from ${SRC_BRANCH} =="
 
