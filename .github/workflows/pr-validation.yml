@@ -2,7 +2,7 @@ name: PR Validation and Testing
 
 on:
   pull_request:
-    branches: [ main ]
+    branches: [ main, master ]
     paths:
       - 'read-write-flyway-files/**'
   workflow_dispatch:
@@ -26,8 +26,9 @@ jobs:
     - name: 🔍 Detect Changed Files
       id: changes
       run: |
+        # Detect changes for both main and master branch PRs
         echo "Detecting changes in read-write-flyway-files..."
-        git diff --name-only origin/main...HEAD -- read-write-flyway-files/ | tee changed_files.txt
+        git diff --name-only origin/${{ github.base_ref }}...HEAD -- read-write-flyway-files/ | tee changed_files.txt
         
         if [[ -s changed_files.txt ]]; then
           echo "has_changes=true" >> $GITHUB_OUTPUT

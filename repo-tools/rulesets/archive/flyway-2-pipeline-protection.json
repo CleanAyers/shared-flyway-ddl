@@ -1,0 +1,78 @@
+{
+  "name": "flyway-2-pipeline-protection",
+  "target": "branch",
+  "source_type": "Repository",
+  "source": "CleanAyers/flyway-2-pipeline",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "exclude": [
+        "dev",
+        "feature/*",
+        "hotfix/*",
+        "bugfix/*",
+        "experimental/*",
+        "pipeline-dev/*",
+        "v2-dev/*"
+      ],
+      "include": [
+        "main",
+        "master",
+        "production",
+        "staging"
+      ]
+    }
+  },
+  "rules": [
+    {
+      "type": "non_fast_forward"
+    },
+    {
+      "type": "deletion"
+    },
+    {
+      "type": "pull_request",
+      "parameters": {
+        "required_approving_review_count": 2,
+        "dismiss_stale_reviews_on_push": true,
+        "require_code_owner_review": true,
+        "require_last_push_approval": false,
+        "required_review_thread_resolution": true
+      }
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": true,
+        "required_status_checks": [
+          "protect-readonly-files",
+          "flyway-validate",
+          "pipeline-config-check",
+          "v2-compatibility-check"
+        ]
+      }
+    },
+    {
+      "type": "file_path_restriction",
+      "parameters": {
+        "restricted_file_paths": [
+          "read-only-flyway-files/**",
+          "config/production.conf",
+          "config/v2-specific.conf"
+        ]
+      }
+    }
+  ],
+  "bypass_actors": [
+    {
+      "actor_id": null,
+      "actor_type": "DeployKey",
+      "bypass_mode": "always"
+    },
+    {
+      "actor_id": 5,
+      "actor_type": "RepositoryRole",
+      "bypass_mode": "always"
+    }
+  ]
+}
