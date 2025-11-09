@@ -23,7 +23,6 @@ AUTO_COMMIT=0
 AUTO_STASH=0
 FORCE_NUCLEAR=0
 PARENT_BRANCH="$DELIVERY_BRANCH"
-PROTECT_REPO=""  # For single repo protection testing
 
 # Help function
 show_help() {
@@ -36,14 +35,12 @@ OPERATIONS:
   nuclear     - Force reset all children (DESTRUCTIVE)
   full        - Complete workflow: publish → sync
   status      - Check sync status (read-only)
-  protect     - Setup branch protection rules (use with --repo)
 
 OPTIONS:
   --auto-commit      Auto-commit dirty working trees
   --auto-stash       Auto-stash dirty working trees  
   --force-nuclear    Skip confirmation for nuclear option
   --child-branch B   Target branch in children (default: main)
-  --repo REPO        Target specific repository for protect operation
   --help            Show this help
 
 EXAMPLES:
@@ -52,24 +49,18 @@ EXAMPLES:
   ./unified_flyway_sync.sh sync --auto-commit
   ./unified_flyway_sync.sh full --auto-commit
   ./unified_flyway_sync.sh nuclear --force-nuclear
-  ./unified_flyway_sync.sh protect --repo flyway-1-pipeline
 
 WORKFLOW:
   1. Make changes in read-write-flyway-files/
   2. Run: ./unified_flyway_sync.sh full --auto-commit
   3. All children will be synchronized automatically
-
-BRANCH PROTECTION:
-  1. Test on one repo: ./unified_flyway_sync.sh protect --repo flyway-1-pipeline
-  2. Check GitHub settings manually
-  3. Apply to all: ./unified_flyway_sync.sh protect
 EOF
 }
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        publish|sync|nuclear|full|status|protect) 
+        publish|sync|nuclear|full|status) 
             if [[ -n "$OPERATION" ]]; then
                 echo "${RED}ERROR: Multiple operations specified${NC}"
                 exit 1
@@ -79,7 +70,6 @@ while [[ $# -gt 0 ]]; do
         --auto-stash) AUTO_STASH=1; shift;;
         --force-nuclear) FORCE_NUCLEAR=1; shift;;
         --child-branch) CHILD_BRANCH="$2"; shift 2;;
-        --repo) PROTECT_REPO="$2"; shift 2;;
         --help) show_help; exit 0;;
         *) echo "${RED}ERROR: Unknown argument: $1${NC}"; show_help; exit 1;;
     esac
@@ -553,127 +543,6 @@ status_check() {
 }
 
 # =============================================================================
-# FUNCTION: Setup branch protection for child repositories
-# =============================================================================
-setup_protection() {
-    echo "${BOLD}${CYAN}🔒 SETTING UP BRANCH PROTECTION${NC}"
-    
-    # Check if GitHub CLI is available
-    if ! command -v gh &> /dev/null; then
-        echo "${RED}ERROR: GitHub CLI (gh) is not installed${NC}"
-        echo "Install with: brew install gh"
-        echo "Then run: gh auth login"
-        exit 1
-    fi
-    
-    # Check if authenticated
-    if ! gh auth status &> /dev/null; then
-        echo "${RED}ERROR: GitHub CLI not authenticated${NC}"
-        echo "Run: gh auth login"
-        exit 1
-    fi
-    
-    # Determine which repositories to protect
-    local repos_to_protect=()
-    if [[ -n "$PROTECT_REPO" ]]; then
-        # Single repo mode for testing
-        repos_to_protect=("$PROTECT_REPO")
-        echo "${CYAN}🎯 TESTING MODE: Protecting single repository: $PROTECT_REPO${NC}"
-    else
-        # All repos mode
-        repos_to_protect=("${CHILD_REPOS[@]}")
-        echo "${CYAN}🌍 FULL MODE: Protecting all child repositories${NC}"
-    fi
-    
-    echo
-    
-    for repo in "${repos_to_protect[@]}"; do
-        echo "${CYAN}-- $repo${NC}"
-        
-        # Check if repo exists
-        if ! gh repo view "CleanAyers/$repo" &> /dev/null; then
-            echo "  ${RED}❌ Repository not found or no access${NC}"
-            continue
-        fi
-        
-        # Check current protection status
-        echo "  ${CYAN}📋 Checking current branch protection...${NC}"
-        
-        if gh api "/repos/CleanAyers/$repo/branches/main/protection" &> /dev/null; then
-            echo "  ${YEL}⚠️  Branch protection already exists${NC}"
-            
-            # Show current settings
-            echo "  ${CYAN}📝 Current protection rules:${NC}"
-            gh api "/repos/CleanAyers/$repo/branches/main/protection" \
-                --jq '.required_pull_request_reviews.required_approving_review_count as $reviews |
-                      .restrictions.users // [] as $users |
-                      .restrictions.teams // [] as $teams |
-                      .restrictions.apps // [] as $apps |
-                      "    Required reviews: \($reviews // "none")",
-                      "    Restricted to users: \($users | map(.login) | join(", ") // "none")",
-                      "    Restricted to teams: \($teams | map(.name) | join(", ") // "none")",
-                      "    Restricted to apps: \($apps | map(.name) | join(", ") // "none")"' 2>/dev/null || echo "    Could not read protection details"
-            
-            read -p "  ${YEL}Update existing protection? (y/n): ${NC}" update_protection
-            if [[ "$update_protection" != "y" ]]; then
-                echo "  ${CYAN}⏭️  Skipping $repo${NC}"
-                continue
-            fi
-        fi
-        
-        echo "  ${CYAN}🔧 Configuring branch protection...${NC}"
-        
-        # Create/update branch protection rule
-        if gh api \
-            --method PUT \
-            -H "Accept: application/vnd.github+json" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "/repos/CleanAyers/$repo/branches/main/protection" \
-            --field required_status_checks='{"strict":true,"contexts":[]}' \
-            --field enforce_admins=false \
-            --field required_pull_request_reviews='{"dismiss_stale_reviews":true,"require_code_owner_reviews":false,"required_approving_review_count":1}' \
-            --field restrictions='{"users":[],"teams":[],"apps":["github-actions"]}' \
-            --field required_linear_history=true \
-            --field allow_force_pushes=false \
-            --field allow_deletions=false \
-            --field block_creations=false \
-            --field required_conversation_resolution=true \
-            &> /dev/null; then
-            
-            echo "  ${GREEN}✅ Branch protection configured successfully${NC}"
-            
-            # Show what was configured
-            echo "  ${CYAN}📋 Protection settings applied:${NC}"
-            echo "    ✓ Require pull request reviews (1 approval)"
-            echo "    ✓ Dismiss stale reviews on new commits"
-            echo "    ✓ Require status checks to be up-to-date"
-            echo "    ✓ Require linear history"
-            echo "    ✓ Restrict pushes to: github-actions app"
-            echo "    ✓ Block force pushes and deletions"
-            echo "    ✓ Require conversation resolution"
-            
-        else
-            echo "  ${RED}❌ Failed to configure branch protection${NC}"
-            echo "  ${YEL}💡 Check if you have admin access to the repository${NC}"
-        fi
-        
-        echo
-    done
-    
-    if [[ -n "$PROTECT_REPO" ]]; then
-        echo "${GREEN}🎯 SINGLE REPOSITORY PROTECTION COMPLETE${NC}"
-        echo "${CYAN}💡 Next steps:${NC}"
-        echo "  1. Check GitHub web interface for $PROTECT_REPO"
-        echo "  2. Test the protection by trying to push directly to main"
-        echo "  3. If satisfied, run without --repo flag to protect all repos"
-    else
-        echo "${GREEN}✅ BRANCH PROTECTION SETUP COMPLETE${NC}"
-        echo "${CYAN}💡 All child repositories are now protected${NC}"
-    fi
-    echo
-}
-
-# =============================================================================
 # MAIN EXECUTION
 # =============================================================================
 
@@ -704,9 +573,6 @@ case "$OPERATION" in
         ;;
     "status")
         status_check
-        ;;
-    "protect")
-        setup_protection
         ;;
     *)
         echo "${RED}ERROR: Unknown operation: $OPERATION${NC}"

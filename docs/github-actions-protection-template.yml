@@ -1,0 +1,59 @@
+name: Flyway Child Repo Protection
+
+on:
+  pull_request:
+    branches: [ main, master ]
+  push:
+    branches: [ main, master ]
+
+jobs:
+  protect-readonly-files:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Check for read-only file modifications
+      run: |
+        # Get changed files
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          CHANGED_FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+        else
+          CHANGED_FILES=$(git diff --name-only HEAD~1)
+        fi
+        
+        # Check if any read-only files were modified
+        if echo "$CHANGED_FILES" | grep -q "read-only-flyway-files/"; then
+          echo "❌ ERROR: read-only-flyway-files/ cannot be modified in child repos"
+          echo "Modified files:"
+          echo "$CHANGED_FILES" | grep "read-only-flyway-files/" || true
+          exit 1
+        fi
+        
+        echo "✅ No read-only files modified"
+
+  flyway-validate:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Flyway
+      run: |
+        wget -qO- https://download.red-gate.com/maven/release/org/flywaydb/flyway-commandline/9.22.3/flyway-commandline-9.22.3-linux-x64.tar.gz | tar xvz
+        sudo ln -s $(pwd)/flyway-9.22.3/flyway /usr/local/bin
+    
+    - name: Validate SQL files
+      run: |
+        # Check if sql directory exists and has files
+        if [ -d "sql" ] && [ "$(ls -A sql/*.sql 2>/dev/null)" ]; then
+          echo "🔍 Validating SQL file naming..."
+          for file in sql/*.sql; do
+            filename=$(basename "$file")
+            if [[ ! "$filename" =~ ^(V[0-9]+(\.[0-9]+)*__|R__|U[0-9]+(\.[0-9]+)*__).*\.sql$ ]]; then
+              echo "❌ Invalid Flyway filename: $filename"
+              exit 1
+            fi
+          done
+          echo "✅ All SQL files follow Flyway naming convention"
+        fi
