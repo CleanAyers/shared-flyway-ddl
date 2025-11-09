@@ -1,75 +1,100 @@
 # Shared Flyway DDL - Distributed Architecture
 
-## 🔄 Repository Sync Status
-
-[![PR Validation](https://github.com/CleanAyers/shared-flyway-ddl/actions/workflows/pr-validation.yml/badge.svg)](https://github.com/CleanAyers/shared-flyway-ddl/actions/workflows/pr-validation.yml)
-[![Production Release](https://github.com/CleanAyers/shared-flyway-ddl/actions/workflows/production-release.yml/badge.svg?branch=main)](https://github.com/CleanAyers/shared-flyway-ddl/actions/workflows/production-release.yml)
+### 🔄 Repository Sync Status: 
+[![PR Validation](https://github.com/CleanAyers/shared-flyway-ddl/actions/workflows/pr-validation.yml/badge.svg)](https://github.com/CleanAyers/shared-flyway-ddl/actions/workflows/pr-validation.yml) [![Production Release](https://github.com/CleanAyers/shared-flyway-ddl/actions/workflows/production-release.yml/badge.svg?branch=main)](https://github.com/CleanAyers/shared-flyway-ddl/actions/workflows/production-release.yml)
 
 
 | Repository | Status | Last Sync | Branch | Notes |
 |------------|--------|-----------|---------|-------|
-| **flyway-1-pipeline** | ![Sync Status](https://img.shields.io/github/workflow/status/CleanAyers/shared-flyway-ddl/Check%20Sync%20Status?label=synced&style=flat-square) | ![Last Commit](https://img.shields.io/github/last-commit/CleanAyers/flyway-1-pipeline/main?label=&style=flat-square) | `main` | Pipeline Database |
-| **flyway-1-grants** | ![Sync Status](https://img.shields.io/github/workflow/status/CleanAyers/shared-flyway-ddl/Check%20Sync%20Status?label=synced&style=flat-square) | ![Last Commit](https://img.shields.io/github/last-commit/CleanAyers/flyway-1-grants/main?label=&style=flat-square) | `main` | Grants & Permissions |
-| **flyway-2-pipeline** | ![Sync Status](https://img.shields.io/github/workflow/status/CleanAyers/shared-flyway-ddl/Check%20Sync%20Status?label=synced&style=flat-square) | ![Last Commit](https://img.shields.io/github/last-commit/CleanAyers/flyway-2-pipeline/main?label=&style=flat-square) | `main` | Pipeline Database |
-| **flyway-2-grants** | ![Sync Status](https://img.shields.io/github/workflow/status/CleanAyers/shared-flyway-ddl/Check%20Sync%20Status?label=synced&style=flat-square) | ![Last Commit](https://img.shields.io/github/last-commit/CleanAyers/flyway-2-grants/main?label=&style=flat-square) | `main` | Grants & Permissions |
+| **flyway-1-pipeline** | [![Downstream Sync Status](https://github.com/CleanAyers/flyway-1-pipeline/actions/workflows/flyway-protection.yml/badge.svg)](https://github.com/CleanAyers/flyway-1-pipeline/actions/workflows/flyway-protection.yml) | ![Last Commit](https://img.shields.io/github/last-commit/CleanAyers/flyway-1-pipeline/main?label=&style=flat-square) | `main` | Pipeline Database |
+| **flyway-1-grants** | [![Downstream Sync Status](https://github.com/CleanAyers/flyway-1-grants/actions/workflows/flyway-protection.yml/badge.svg)](https://github.com/CleanAyers/flyway-1-grants/actions/workflows/flyway-protection.yml) | ![Last Commit](https://img.shields.io/github/last-commit/CleanAyers/flyway-1-grants/main?label=&style=flat-square) | `main` | Grants & Permissions |
+| **flyway-2-pipeline** | [![Downstream Sync Status](https://github.com/CleanAyers/flyway-2-pipeline/actions/workflows/flyway-protection.yml/badge.svg)](https://github.com/CleanAyers/flyway-2-pipeline/actions/workflows/flyway-protection.yml) | ![Last Commit](https://img.shields.io/github/last-commit/CleanAyers/flyway-2-pipeline/main?label=&style=flat-square) | `main` | Pipeline Database |
+| **flyway-2-grants** | [![Downstream Sync Status](https://github.com/CleanAyers/flyway-2-grants/actions/workflows/flyway-protection.yml/badge.svg)](https://github.com/CleanAyers/flyway-2-grants/actions/workflows/flyway-protection.yml) | ![Last Commit](https://img.shields.io/github/last-commit/CleanAyers/flyway-2-grants/main?label=&style=flat-square) | `main` | Grants & Permissions |
 
-### 🎯 Quick Actions
-- **📊 [Check Detailed Status](../../actions/workflows/sync-status.yml)** - View complete synchronization report
-- **🔄 [Manual Sync](../../actions/workflows/auto-sync.yml)** - Trigger synchronization manually
-- **📋 [View Logs](../../actions)** - See recent sync operations
+### 🎯 The Simple Workflow
 
-### 🚀 Automation Status
-- **✅ Auto-sync on push to `main`** - Automatically syncs all child repositories
-- **✅ Status monitoring** - Real-time sync status tracking
-- **✅ Conflict detection** - Alerts on sync issues
-- **🔔 Notifications** - Slack/email alerts on failures (optional)
+1. **Add your files to the parent repository** (`shared-flyway-ddl/read-write-flyway-files`) 
+2. **Merge to `main` branch** 
+3. **Pipeline automatically syncs to all child repositories**
+4. **Child repositories get all new files within the shared folder added**
 
----
+### 🚀 Quick Reference
 
-## Running Postgres DB related Notes
-- Quick Start on Mac
+## 📊 Repository Flow Diagram
 
-1) Create DB (Postgres.app or psql)
-createdb sports_data
-
-2) Put files in place
-  project/
-    conf/flyway.conf
-        sql/V1__init.sql
-
-3) Run migration
-flyway -configFiles=conf/flyway.conf migrate
-
-4) Smoke test
-psql sports_data -c "\dt sports.*"
-psql sports_data -c "SELECT * FROM sports.fixtures LIMIT 5;"
-
-
-## 🎯 Recommended Approach for Your Hobby Project
-
-#### Phase 1: Local Development
 ```
-# Start with local PostgreSQL
-brew install postgresql
-createdb cluster1_dev
-createdb cluster2_dev
+                           🏛️ PARENT REPOSITORY
+                        shared-flyway-ddl (main)
+                                   │
+                          ┌────────┴────────┐
+                          │ Git Subtree     │
+                          │ Auto-Sync       │
+                          │ GitHub Actions  │
+                          └────────┬────────┘
+                                   │
+              ┌────────────────────┼────────────────────┐
+              │                    │                    │
+              ▼                    │                    ▼
+    ╔═══════════════════╗          │          ╔═══════════════════╗
+    ║    CLUSTER-1      ║          │          ║    CLUSTER-2      ║
+    ║                   ║          │          ║                   ║
+    ║  ┌─────────────┐  ║          │          ║  ┌─────────────┐  ║
+    ║  │ flyway-1-   │◄─╬          │          ╬─►│ flyway-2-   │  ║
+    ║  │ pipeline    │  ║          │          ║  │ pipeline    │  ║
+    ║  └─────────────┘  ║          │          ║  └─────────────┘  ║
+    ║        │          ║          │          ║        │          ║
+    ║        │          ║          │          ║        │          ║
+    ║  ┌─────────────┐  ║          │          ║  ┌─────────────┐  ║
+    ║  │ flyway-1-   │◄─╬          │          ╬─►│ flyway-2-   │  ║
+    ║  │ grants      │  ║          │          ║  │ grants      │  ║
+    ║  └─────────────┘  ║          │          ║  └─────────────┘  ║
+    ╚═══════════════════╝          │          ╚═══════════════════╝
+                                   │
+                                   ▼
+                          ┌────────────────┐
+                          │   Sync Status  │
+                          │   Monitoring   │
+                          │   (Optional)   │
+                          └────────────────┘
 ```
 
-#### Phase 2: Cloud Testing
-- Neon for Cluster 1 (great branching features)
-- Supabase for Cluster 2 (nice dashboard)
+## 🔄 Data Flow Architecture
 
-#### Phase 3: "Production" Simulation
-
-- Keep using free tiers but treat them as prod
-- Your Flyway architecture will work identically
-- All your CI/CD pipelines will function the same
-  
-### 💡 Bonus: Perfect for Your Architecture
-Your distributed Flyway setup is actually ideal for free tiers because:
-
-1. Small databases - You're not storing massive amounts of data
-2. Clear separation - Each cluster can use different providers
-3. Easy migration - If you outgrow free tiers, just change connection strings
-4. Real testing - You get to test your sync mechanism across actual different databases# Test commit
-# Test permissions fix - Sat Nov  8 11:03:00 CST 2025
+```
+Parent Repo Structure:
+┌─ shared-flyway-ddl/
+│  ├─ read-write-flyway-files/  ← ✏️  EDIT HERE
+│  │  ├─ sql/
+│  │  ├─ callbacks/
+│  │  ├─ global_config/
+│  │  ├─ scripts/
+│  │  └─ yaml/
+│  └─ .github/workflows/
+│     ├─ auto-sync.yml         ← 🤖 Auto triggers
+│     └─ production-release.yml ← 🚀 Production deploy
+│
+│
+└─ SYNCS TO ────────────────────────────┐
+                                        │
+┌───────────────────────────────────────▼─────────────────────────────────┐
+│                     Child Repositories                                  │
+│                                                                         │
+│  flyway-1-pipeline/          flyway-1-grants/                           │
+│  ├─ config/ (local)          ├─ conf/ (local)                           │
+│  └─ read-only-flyway-files/  └─ read-only-flyway-files/                 │
+│     ├─ sql/ ◄────────────────────┬─ sql/ ◄─────────────┐                │
+│     ├─ callbacks/               ├─ callbacks/          │                │
+│     ├─ global_config/           ├─ global_config/      │                │
+│     ├─ scripts/                 ├─ scripts/            │                │
+│     └─ yaml/                    └─ yaml/               │                │
+│                                                        │                │
+│  flyway-2-pipeline/          flyway-2-grants/          │                │
+│  ├─ config/ (local)          ├─ config/ (local)        │                │
+│  └─ read-only-flyway-files/  └─ read-only-flyway-files/│                │
+│     ├─ sql/ ◄────────────────────┬─ sql/ ◄─────────────┘                │
+│     ├─ callbacks/               ├─ callbacks/                           │
+│     ├─ global_config/           ├─ global_config/                       │
+│     ├─ scripts/                 ├─ scripts/                             │
+│     └─ yaml/                    └─ yaml/                                │
+└─────────────────────────────────────────────────────────────────────────┘
+```

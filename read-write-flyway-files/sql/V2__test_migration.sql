@@ -1,6 +1,7 @@
 -- V2__test_migration.sql
 -- Test migration file to verify sync system works
 -- Created: November 8, 2025
+-- pipeline trigger
 
 CREATE TABLE test_sync_table (
     id SERIAL PRIMARY KEY,
