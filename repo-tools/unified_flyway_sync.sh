@@ -105,6 +105,21 @@ echo "${CYAN}Target path:${NC} $CHILD_SUBTREE_PATH"
 echo
 
 # =============================================================================
+# FUNCTION: Configure Git authentication for CI environments
+# =============================================================================
+configure_git_auth() {
+    # Configure Git for GitHub Actions authentication
+    if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+        echo "  ${CYAN}AUTH:${NC} Configuring GitHub token authentication..."
+        git config --global user.name "github-actions[bot]"
+        git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        
+        # Configure URL rewriting to use token authentication
+        git config --global url."https://x-access-token:${GITHUB_TOKEN}@github.com/".insteadOf "https://github.com/"
+    fi
+}
+
+# =============================================================================
 # FUNCTION: Ensure clean Git state for all repositories
 # =============================================================================
 ensure_git_hygiene() {
@@ -530,6 +545,9 @@ status_check() {
 # =============================================================================
 # MAIN EXECUTION
 # =============================================================================
+
+# Configure authentication for CI environments
+configure_git_auth
 
 # Always ensure Git hygiene first (except for status which is read-only)
 if [[ "$OPERATION" != "status" ]]; then
