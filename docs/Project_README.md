@@ -26,32 +26,39 @@ This project is a **learning laboratory** for exploring distributed Git reposito
 ```
 Flyway-Repo-Structure/                    # 🎓 Learning workspace
 ├── shared-flyway-ddl/                    # 🏗️ PARENT - Central DDL governance
-│   ├── shared/                           # Source files for distribution
-│   │   ├── README.md                     # Shared documentation
-│   │   ├── hooks/                        # Git protection hooks
-│   │   ├── sh/                           # Automation scripts
-│   │   ├── sql/                          # Baseline migrations
-│   │   └── yaml/                         # Configuration templates
-│   ├── validate_children_ro_shared.sh    # Parent→Child sync validator
-│   └── parent_publish_shared.sh          # Content publishing script
+│   ├── README.md                         # Entry-point documentation
+│   ├── docs/                             # Deep dives, diagrams, runbooks
+│   ├── read-write-flyway-files/          # Source-of-truth migrations
+│   │   ├── sql/                          # Baseline + experimental migrations
+│   │   ├── yaml/                         # Config + manifest templates
+│   │   ├── callbacks/                    # Flyway callback scripts
+│   │   ├── scripts/                      # Helper SQL/PSQL utilities
+│   │   └── global_config/                # Shared Flyway configuration
+│   └── repo-tools/                       # Automation + governance helpers
+│       ├── unified_flyway_sync.sh        # Parent→child distributor (VS Code task)
+│       ├── setup-child-protection.sh     # Ruleset/bootstrap helper
+│       ├── security-audit.sh             # Guardrail scanner
+│       └── rulesets/                     # JSON rules consumed by children
 │
 ├── flyway-1-pipeline/                    # 🏗️ Cluster 1 - Schema DDL
-│   ├── ro-shared-ddl/                    # Synced from parent (READ-ONLY)
-│   └── [cluster-specific migrations]     # Local Flyway scripts
+│   ├── .github/workflows/                # Landing confirmation & protections
+│   ├── config/                           # Branch ruleset JSON + metadata
+│   └── read-only-flyway-files/           # Synced parent payload (READ-ONLY)
 │
 ├── flyway-1-grants/                      # 🔐 Cluster 1 - Access control
-│   ├── ro-shared-ddl/                    # Synced from parent (READ-ONLY)
-│   └── [cluster-specific grants]         # Local permission scripts
+│   ├── .github/workflows/                # Grants-specific checks/badges
+│   ├── config/                           # Grants rulesets + metadata
+│   └── read-only-flyway-files/           # Shared DDL snapshot (READ-ONLY)
 │
 ├── flyway-2-pipeline/                    # 🏗️ Cluster 2 - Schema DDL
-│   ├── ro-shared-ddl/                    # Synced from parent (READ-ONLY)
-│   └── [cluster-specific migrations]     # Local Flyway scripts
+│   ├── .github/workflows/                # Cluster 2 landing confirmation
+│   ├── config/                           # Protection configs
+│   └── read-only-flyway-files/           # Synced parent payload
 │
-├── flyway-2-grants/                      # 🔐 Cluster 2 - Access control
-│   ├── ro-shared-ddl/                    # Synced from parent (READ-ONLY)
-│   └── [cluster-specific grants]         # Local permission scripts
-│
-└── nuclear_subtree_sync.sh               # 🚨 Emergency sync tool
+└── flyway-2-grants/                      # 🔐 Cluster 2 - Access control
+    ├── .github/workflows/                # Cluster 2 grants guardrails
+    ├── config/                           # Branch rules + metadata
+    └── read-only-flyway-files/           # Shared DDL snapshot (READ-ONLY)
 ```
 
 ### Data Flow
