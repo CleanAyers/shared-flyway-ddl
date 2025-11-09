@@ -346,15 +346,15 @@ sync_children() {
         
         # Sync if needed
         if [[ "$CHILD_TREE" == "$PARENT_TREE" && -n "$CHILD_TREE" ]]; then
-            echo "  ${GREEN}OK:${NC} up to date (tree ${CHILD_TREE:0:12}...)"
+            echo "  ${GREEN}🟢 UP-TO-DATE${NC} (tree ${CHILD_TREE:0:12}...)"
         else
-            echo "  ${YEL}SYNC:${NC} child=${CHILD_TREE:0:12} parent=${PARENT_TREE:0:12}"
+            echo "  ${YEL}🔄 SYNCING:${NC} child=${CHILD_TREE:0:12} parent=${PARENT_TREE:0:12}"
             
             if [[ -z "$CHILD_TREE" ]]; then
-                echo "  ${CYAN}ADD:${NC} First-time subtree add"
+                echo "  ${CYAN}➕ ADD:${NC} First-time subtree add"
                 git subtree add --prefix="$CHILD_SUBTREE_PATH" "parent-shared" "$DELIVERY_BRANCH" --squash
             else
-                echo "  ${CYAN}PULL:${NC} Updating existing subtree"
+                echo "  ${CYAN}🔄 PULL:${NC} Updating existing subtree"
                 git subtree pull --prefix="$CHILD_SUBTREE_PATH" "parent-shared" "$DELIVERY_BRANCH" --squash
             fi
             
@@ -365,15 +365,15 @@ sync_children() {
             fi
             
             # Push changes
-            echo "  ${CYAN}PUSH:${NC} Uploading to GitHub..."
+            echo "  ${CYAN}⬆️ PUSH:${NC} Uploading to GitHub..."
             git push origin "$CHILD_BRANCH"
             
             # Verify sync
             CHILD_TREE_AFTER="$(git rev-parse "HEAD:$CHILD_SUBTREE_PATH")"
             if [[ "$CHILD_TREE_AFTER" == "$PARENT_TREE" ]]; then
-                echo "  ${GREEN}✓ SYNCED:${NC} now up to date (tree ${CHILD_TREE_AFTER:0:12}...)"
+                echo "  ${GREEN}✅ SYNCED:${NC} now up to date (tree ${CHILD_TREE_AFTER:0:12}...)"
             else
-                echo "  ${RED}✗ FAILED:${NC} sync verification failed"
+                echo "  ${RED}❌ FAILED:${NC} sync verification failed"
                 ((FAIL_COUNT++))
             fi
         fi
@@ -512,7 +512,7 @@ status_check() {
         echo "${CYAN}-- $repo${NC}"
         
         if [[ ! -d "$CHILD_DIR/.git" ]]; then
-            echo "  ${YEL}MISSING:${NC} Repository not cloned"
+            echo "  ${YEL}🟡 MISSING:${NC} Repository not cloned"
             ALL_SYNCED=0
             continue
         fi
@@ -522,13 +522,13 @@ status_check() {
         if git cat-file -e "HEAD:$CHILD_SUBTREE_PATH" 2>/dev/null; then
             CHILD_TREE="$(git rev-parse "HEAD:$CHILD_SUBTREE_PATH")"
             if [[ "$CHILD_TREE" == "$PARENT_TREE" ]]; then
-                echo "  ${GREEN}✓ SYNCED${NC} (tree ${CHILD_TREE:0:12}...)"
+                echo "  ${GREEN}🟢 SYNCED${NC} (tree ${CHILD_TREE:0:12}...)"
             else
-                echo "  ${RED}✗ OUT-OF-DATE${NC} (child: ${CHILD_TREE:0:12} parent: ${PARENT_TREE:0:12})"
+                echo "  ${RED}🔴 OUT-OF-DATE${NC} (child: ${CHILD_TREE:0:12} parent: ${PARENT_TREE:0:12})"
                 ALL_SYNCED=0
             fi
         else
-            echo "  ${YEL}⚠️  NO SUBTREE${NC} ($CHILD_SUBTREE_PATH missing)"
+            echo "  ${YEL}🟡 NO SUBTREE${NC} ($CHILD_SUBTREE_PATH missing)"
             ALL_SYNCED=0
         fi
     done
