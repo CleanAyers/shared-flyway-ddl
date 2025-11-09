@@ -48,6 +48,12 @@ jobs:
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         # Configure Git to use token for all GitHub operations
         git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        # Disable interactive prompts for credentials
+        git config --global credential.helper ""
+        git config --global core.askPass ""
+        # Set GIT_ASKPASS to prevent interactive prompts
+        echo "export GIT_ASKPASS=true" >> $GITHUB_ENV
+        echo "export GIT_TERMINAL_PROMPT=0" >> $GITHUB_ENV
 
     - name: 🔐 Setup GitHub CLI Authentication
       env:
@@ -97,6 +103,8 @@ jobs:
       id: sync_step
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GIT_ASKPASS: "true"
+        GIT_TERMINAL_PROMPT: "0"
       run: |
         echo "🚀 Starting sync process..."
         
