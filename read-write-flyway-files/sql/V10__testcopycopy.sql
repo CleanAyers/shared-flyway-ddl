@@ -1,1 +1,2 @@
 -- clearing out child failed jobs
+-- but we did make the readme better :)
