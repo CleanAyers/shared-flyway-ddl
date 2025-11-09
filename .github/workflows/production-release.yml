@@ -32,7 +32,6 @@ jobs:
   production-sync:
     name: Production Sync to All Child Repositories
     runs-on: ubuntu-latest
-    # Remove environment requirement that was causing issues
     # Run if: PR merged to main, OR pushed to dev, OR manual trigger
     if: github.event.pull_request.merged == true || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     
@@ -47,6 +46,8 @@ jobs:
       run: |
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
+        # Configure Git to use token for all GitHub operations
+        git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
 
     - name: 🔐 Setup GitHub CLI Authentication
       env:
@@ -70,9 +71,13 @@ jobs:
           fi
         
           if [ ! -d "$repo" ]; then
-            echo "Cloning $repo..."
+            echo "Cloning $repo with authentication..."
             if gh repo clone "CleanAyers/$repo" "$repo"; then
               echo "✅ Successfully cloned $repo"
+              # Configure credentials for this specific repo
+              cd "$repo"
+              git config remote.origin.url "https://${{ secrets.GITHUB_TOKEN }}@github.com/CleanAyers/$repo.git"
+              cd ..
             else
               echo "❌ Failed to clone CleanAyers/$repo"
               exit 1
@@ -80,6 +85,8 @@ jobs:
           else
             echo "$repo already exists, updating..."
             cd "$repo"
+            # Configure credentials for existing repo
+            git config remote.origin.url "https://${{ secrets.GITHUB_TOKEN }}@github.com/CleanAyers/$repo.git"
             git fetch --all
             git reset --hard origin/main || true
             cd ..
@@ -88,6 +95,8 @@ jobs:
 
     - name: 🚀 Publish and Sync
       id: sync_step
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
         echo "🚀 Starting sync process..."
         
