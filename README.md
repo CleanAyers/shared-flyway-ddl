@@ -2,7 +2,7 @@
 
 ## 🔄 Repository Sync Status
 
-[![Auto Sync Pipeline](https://github.com/CleanAyers/shared-flyway-ddl/actions/workflows/auto-sync.yml/badge.svg)](https://github.com/CleanAyers/shared-flyway-ddl/actions/workflows/auto-sync.yml)
+[![Auto Sync Pipeline](https://github.com/CleanAyers/shared-flyway-ddl/actions/workflows/auto-sync.yml/badge.svg)](https://github.com/CleanAyers/shared-flyway-ddl/actions/workflows/production-release.yml)
 
 | Repository | Status | Last Sync | Branch | Notes |
 |------------|--------|-----------|---------|-------|
