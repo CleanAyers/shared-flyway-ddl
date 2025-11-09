@@ -1,4 +1,4 @@
- -- Sample Shop Database Schema (~18 tables + triggers)
+-- Sample Shop Database Schema (~18 tables + triggers)
 -- Designed for exploration, DDL extraction, and trigger testing
 
 -- Drop existing objects
