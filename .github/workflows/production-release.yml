@@ -26,7 +26,8 @@ permissions:
 
 env:
   CHILD_REPOS: 'flyway-1-pipeline flyway-1-grants flyway-2-pipeline flyway-2-grants'
-  GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  # Use flyway-sync-token with broader permissions instead of GITHUB_TOKEN
+  GH_TOKEN: ${{ secrets.FLYWAY_SYNC_TOKEN }}
 
 jobs:
   production-sync:
@@ -39,32 +40,42 @@ jobs:
     - name: 🔑 Checkout Parent Repository
       uses: actions/checkout@v4
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
+        # Use PAT token instead of GITHUB_TOKEN for broader access
+        token: ${{ secrets.FLYWAY_SYNC_TOKEN || secrets.GITHUB_TOKEN }}
         fetch-depth: 0
 
     - name: 🛠️ Setup Git Configuration
+      env:
+        # Use PAT token if available, fallback to GITHUB_TOKEN
+        ACCESS_TOKEN: ${{ secrets.FLYWAY_SYNC_TOKEN || secrets.GITHUB_TOKEN }}
       run: |
         git config --global user.name "github-actions[bot]"
         git config --global user.email "github-actions[bot]@users.noreply.github.com"
         # Configure Git to use token for all GitHub operations
-        git config --global url."https://${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+        git config --global url."https://x-access-token:${ACCESS_TOKEN}@github.com/".insteadOf "https://github.com/"
         # Disable interactive prompts for credentials
         git config --global credential.helper ""
         git config --global core.askPass ""
-        # Set GIT_ASKPASS to prevent interactive prompts
-        echo "export GIT_ASKPASS=true" >> $GITHUB_ENV
-        echo "export GIT_TERMINAL_PROMPT=0" >> $GITHUB_ENV
+        # Set environment variables to prevent interactive prompts
+        echo "GIT_ASKPASS=true" >> $GITHUB_ENV
+        echo "GIT_TERMINAL_PROMPT=0" >> $GITHUB_ENV
 
     - name: 🔐 Setup GitHub CLI Authentication
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.FLYWAY_SYNC_TOKEN || secrets.GITHUB_TOKEN }}
       run: |
-        echo "🔍 Using built-in GITHUB_TOKEN for authentication"
+        echo "🔍 Setting up GitHub CLI authentication"
+        if [[ -n "${{ secrets.FLYWAY_SYNC_TOKEN }}" ]]; then
+          echo "Using FLYWAY_SYNC_TOKEN for enhanced permissions"
+        else
+          echo "Using GITHUB_TOKEN with standard permissions"
+        fi
         gh auth status
 
     - name: 📂 Clone Child Repositories
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.FLYWAY_SYNC_TOKEN || secrets.GITHUB_TOKEN }}
+        ACCESS_TOKEN: ${{ secrets.FLYWAY_SYNC_TOKEN || secrets.GITHUB_TOKEN }}
       run: |
         echo "📂 Cloning child repositories for sync..."
         cd /home/runner/work/shared-flyway-ddl
@@ -72,7 +83,8 @@ jobs:
         for repo in flyway-1-pipeline flyway-1-grants flyway-2-pipeline flyway-2-grants; do
           echo "Checking CleanAyers/$repo..."
           if ! gh repo view "CleanAyers/$repo" >/dev/null 2>&1; then
-            echo "❌ CleanAyers/$repo does not exist or gh cannot access it."
+            echo "❌ CleanAyers/$repo does not exist or cannot be accessed."
+            echo "This might be due to insufficient token permissions."
             exit 1
           fi
         
@@ -80,9 +92,9 @@ jobs:
             echo "Cloning $repo with authentication..."
             if gh repo clone "CleanAyers/$repo" "$repo"; then
               echo "✅ Successfully cloned $repo"
-              # Configure credentials for this specific repo
+              # Configure credentials for this specific repo using PAT token
               cd "$repo"
-              git config remote.origin.url "https://${{ secrets.GITHUB_TOKEN }}@github.com/CleanAyers/$repo.git"
+              git config remote.origin.url "https://x-access-token:${ACCESS_TOKEN}@github.com/CleanAyers/$repo.git"
               cd ..
             else
               echo "❌ Failed to clone CleanAyers/$repo"
@@ -91,8 +103,8 @@ jobs:
           else
             echo "$repo already exists, updating..."
             cd "$repo"
-            # Configure credentials for existing repo
-            git config remote.origin.url "https://${{ secrets.GITHUB_TOKEN }}@github.com/CleanAyers/$repo.git"
+            # Configure credentials for existing repo using PAT token
+            git config remote.origin.url "https://x-access-token:${ACCESS_TOKEN}@github.com/CleanAyers/$repo.git"
             git fetch --all
             git reset --hard origin/main || true
             cd ..
@@ -102,7 +114,8 @@ jobs:
     - name: 🚀 Publish and Sync
       id: sync_step
       env:
-        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GH_TOKEN: ${{ secrets.FLYWAY_SYNC_TOKEN || secrets.GITHUB_TOKEN }}
+        ACCESS_TOKEN: ${{ secrets.FLYWAY_SYNC_TOKEN || secrets.GITHUB_TOKEN }}
         GIT_ASKPASS: "true"
         GIT_TERMINAL_PROMPT: "0"
       run: |
@@ -135,7 +148,6 @@ jobs:
         echo "- **Commit**: ${{ github.sha }}" >> sync_report.md
         echo "- **Triggered by**: ${{ github.actor }}" >> sync_report.md
         echo "- **Sync time**: $(date)" >> sync_report.md
-        echo "" >> sync_report.md
         
         if [[ "${{ steps.sync_step.outputs.sync_success }}" == "true" ]]; then
           echo "✅ **Status**: Sync successful" >> sync_report.md
