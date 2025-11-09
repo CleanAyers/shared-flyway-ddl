@@ -1,0 +1,12 @@
+# Global protection - require your approval for everything
+* @CleanAyers
+
+# Critical paths - absolutely require your review
+read-only-flyway-files/ @CleanAyers
+config/ @CleanAyers
+conf/ @CleanAyers
+*.conf @CleanAyers
+
+# SQL files - require review from someone who understands Flyway
+sql/ @CleanAyers
+*.sql @CleanAyers

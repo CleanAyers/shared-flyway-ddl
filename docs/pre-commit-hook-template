@@ -1,0 +1,41 @@
+#!/bin/bash
+# Pre-commit hook to prevent disasters in Flyway child repos
+
+# Check if trying to modify read-only files
+if git diff --cached --name-only | grep -q "read-only-flyway-files/"; then
+    echo "❌ ERROR: Cannot modify read-only-flyway-files/"
+    echo "   These files are managed by the parent repository."
+    echo "   Make changes in shared-flyway-ddl instead."
+    exit 1
+fi
+
+# Check for dangerous SQL patterns
+dangerous_patterns=(
+    "DROP DATABASE"
+    "DROP SCHEMA" 
+    "TRUNCATE.*;"
+    "DELETE FROM.*WHERE.*1.*=.*1"
+    "UPDATE.*SET.*WHERE.*1.*=.*1"
+)
+
+for pattern in "${dangerous_patterns[@]}"; do
+    if git diff --cached | grep -iE "$pattern"; then
+        echo "❌ ERROR: Dangerous SQL pattern detected: $pattern"
+        echo "   Please review this change carefully."
+        exit 1
+    fi
+done
+
+# Validate Flyway file naming
+if git diff --cached --name-only | grep -E "sql/.*\.sql$"; then
+    for file in $(git diff --cached --name-only | grep -E "sql/.*\.sql$"); do
+        filename=$(basename "$file")
+        if [[ ! "$filename" =~ ^(V[0-9]+(\.[0-9]+)*__|R__|U[0-9]+(\.[0-9]+)*__).*\.sql$ ]]; then
+            echo "❌ ERROR: Invalid Flyway filename: $filename"
+            echo "   Must start with V###__, R__, or U###__"
+            exit 1
+        fi
+    done
+fi
+
+echo "✅ Pre-commit validation passed"
