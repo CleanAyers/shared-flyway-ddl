@@ -7,7 +7,7 @@ on:
     paths:
       - 'read-write-flyway-files/**'
   push:
-    branches: [ dev ]
+    branches: [ main ]
     paths:
       - 'read-write-flyway-files/**'
   workflow_dispatch:
@@ -33,7 +33,7 @@ jobs:
   production-sync:
     name: Production Sync to All Child Repositories
     runs-on: ubuntu-latest
-    # Run if: PR merged to main, OR pushed to dev, OR manual trigger
+    # Run if: PR merged to main, OR pushed to main, OR manual trigger
     if: github.event.pull_request.merged == true || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     
     steps:
