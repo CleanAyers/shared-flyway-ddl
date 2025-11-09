@@ -1,4 +1,4 @@
-# Shared Flyway DDL - Distributed Architecture
+# Shared Database DDL - Distributed Architecture
 
 ### 🔄 Repository Sync Status: 
 [![PR Validation](https://github.com/CleanAyers/shared-flyway-ddl/actions/workflows/pr-validation.yml/badge.svg)](https://github.com/CleanAyers/shared-flyway-ddl/actions/workflows/pr-validation.yml) [![Production Release](https://github.com/CleanAyers/shared-flyway-ddl/actions/workflows/production-release.yml/badge.svg?branch=main)](https://github.com/CleanAyers/shared-flyway-ddl/actions/workflows/production-release.yml)
